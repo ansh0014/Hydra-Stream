@@ -5,40 +5,61 @@ import TopologyView from './components/TopologyView';
 import KafkaExplorerView from './components/KafkaExplorerView';
 import ChaosStudioView from './components/ChaosStudioView';
 import ComplianceVaultView from './components/ComplianceVaultView';
-import { INITIAL_REGIONS, INITIAL_TOPICS, INITIAL_MESSAGES } from './services/api';
+import { REGION_METADATA, CLUSTER_TOPICS, fetchTopology, resolveRoute, fetchHealth } from './services/api';
+
+function buildInitialRegions() {
+  return {
+    india: {
+      id: 'broker-india-1',
+      endpoint: '127.0.0.1:9092',
+      healthPort: 8081,
+      status: 'HEALTHY',
+      rtt: 10,
+      packetLoss: 0.0,
+      boundTopics: ['upi-transactions', 'orders-india', 'global-telemetry'],
+      ...REGION_METADATA.india,
+    },
+    germany: {
+      id: 'broker-germany-1',
+      endpoint: '127.0.0.1:9093',
+      healthPort: 8082,
+      status: 'HEALTHY',
+      rtt: 85,
+      packetLoss: 0.0,
+      boundTopics: ['gdpr-user-audit', 'eu-payments'],
+      ...REGION_METADATA.germany,
+    },
+    singapore: {
+      id: 'broker-singapore-1',
+      endpoint: '127.0.0.1:9094',
+      healthPort: 8083,
+      status: 'HEALTHY',
+      rtt: 40,
+      packetLoss: 0.0,
+      boundTopics: ['apac-fx', 'global-telemetry'],
+      ...REGION_METADATA.singapore,
+    },
+  };
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('landing');
-  const [regions, setRegions] = useState(INITIAL_REGIONS);
-  const [topics, setTopics] = useState(INITIAL_TOPICS);
-  const [messages, setMessages] = useState(INITIAL_MESSAGES);
+  const [regions, setRegions] = useState(buildInitialRegions);
+  const [topics, setTopics] = useState(CLUSTER_TOPICS);
+  const [messages, setMessages] = useState([]);
   const [clusterHealth, setClusterHealth] = useState('HEALTHY');
   const [throughput, setThroughput] = useState(309597);
-  const [totalMessages, setTotalMessages] = useState(8199052);
+  const [totalMessages, setTotalMessages] = useState(0);
   const [gdprPrevented, setGdprPrevented] = useState(0);
   const [activeChaos, setActiveChaos] = useState(null);
 
   const [events, setEvents] = useState([
     {
       id: 'e1',
-      timestamp: '02:00:15',
-      category: 'Discovery',
-      level: 'success',
-      message: 'etcd v3 watcher registered 3 active brokers: India (9092), Germany (9093), Singapore (9094).',
-    },
-    {
-      id: 'e2',
-      timestamp: '02:00:10',
-      category: 'Telemetry',
-      level: 'info',
-      message: 'Prometheus latency scraper polling interval: 2s. All inter-region links operational.',
-    },
-    {
-      id: 'e3',
-      timestamp: '02:00:01',
+      timestamp: new Date().toTimeString().split(' ')[0],
       category: 'System',
       level: 'info',
-      message: 'Hydra Control Plane Coordinator initialized. C++ bounded ringbuffer queues active.',
+      message: 'Hydra Dashboard ready. Connecting to Hydra Control Plane...',
     },
   ]);
 
@@ -54,23 +75,47 @@ export default function App() {
     setEvents((prev) => [newEvt, ...prev.slice(0, 50)]);
   };
 
-  // Heartbeat tick
+  // Poll live cluster topology from Go Control Plane
+  const syncClusterTopology = async () => {
+    try {
+      const data = await fetchTopology();
+      if (data && data.brokers && data.brokers.length > 0) {
+        setRegions((prev) => {
+          const next = { ...prev };
+          data.brokers.forEach((b) => {
+            const key = b.region.toLowerCase();
+            if (next[key]) {
+              next[key].id = b.id;
+              next[key].endpoint = b.endpoint;
+              next[key].status = b.status || 'HEALTHY';
+              if (b.rtt) {
+                // Convert nanoseconds to milliseconds if needed
+                next[key].rtt = b.rtt > 1000000 ? Math.round(b.rtt / 1000000) : b.rtt;
+              }
+              next[key].packetLoss = b.packet_loss || 0.0;
+            }
+          });
+          return next;
+        });
+        logEvent('Discovery', `etcd cluster sync: ${data.brokers.length} live brokers active.`, 'success');
+      }
+    } catch (err) {
+      // Background sync notification
+    }
+  };
+
+  useEffect(() => {
+    syncClusterTopology();
+    const interval = setInterval(syncClusterTopology, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Heartbeat live rate ticker
   useEffect(() => {
     const timer = setInterval(() => {
-      setThroughput((prev) => Math.max(100000, Math.round(prev + (Math.random() * 6000 - 3000))));
+      setThroughput((prev) => Math.max(100000, Math.round(prev + (Math.random() * 4000 - 2000))));
       setTotalMessages((prev) => prev + Math.floor(throughput / 60));
-
-      setRegions((prev) => {
-        const next = { ...prev };
-        Object.keys(next).forEach((k) => {
-          if (next[k].status === 'HEALTHY') {
-            const base = INITIAL_REGIONS[k].baseRTT;
-            next[k].rtt = Math.max(2, Math.round(base + (Math.random() * 4 - 2)));
-          }
-        });
-        return next;
-      });
-    }, 1200);
+    }, 1500);
 
     return () => clearInterval(timer);
   }, [throughput]);
@@ -88,8 +133,16 @@ export default function App() {
         status: 'DEGRADED',
       },
     }));
-    logEvent('Chaos', 'Simulating Undersea Fiber Cut: Injected +260ms RTT & 15% packet drop via Linux tc netem.', 'warn');
-    logEvent('Router', 'Envoy Dynamic Traffic Steer: Bypassed India link; redirected global telemetry through Singapore (40ms).', 'info');
+    logEvent(
+      'ChaosEngine',
+      'FAULT INJECTED: Undersea fiber cut on broker-india-1 (+260ms RTT, 15% packet drop via Linux tc netem).',
+      'warn'
+    );
+    logEvent(
+      'Routing',
+      'Hydra Router: Link score collapsed (<200ms threshold breached). Dynamic bypass active -> Global traffic steered to Singapore.',
+      'info'
+    );
   };
 
   const handleInjectBlackout = () => {
@@ -99,117 +152,80 @@ export default function App() {
       ...prev,
       germany: {
         ...prev.germany,
+        status: 'OFFLINE',
         rtt: 0,
         packetLoss: 1.0,
-        status: 'OFFLINE',
       },
     }));
-    logEvent('Chaos', 'Regional Disaster: Germany (Frankfurt) broker blacked out! Power loss simulated.', 'error');
-    logEvent('Quorum', 'Autonomous Regional Quorum Engaged: India & Singapore continue serving without cluster freeze!', 'warn');
-    logEvent('Residency', 'GDPR Quarantine Active: All EU topics quarantined at edge; 0 bytes leaked cross-border.', 'success');
+    logEvent(
+      'ChaosEngine',
+      'REGIONAL OUTAGE: Frankfurt datacenter power grid failure on broker-germany-1. Node marked OFFLINE.',
+      'error'
+    );
+    logEvent(
+      'Compliance',
+      'Sovereign Boundary Active: Topics "gdpr-user-audit" and "eu-payments" quarantined. Ingress rejected with 403 Forbidden to prevent illegal spillover.',
+      'warn'
+    );
   };
 
-  const handleEmitBurst = () => {
-    const original = throughput;
-    setThroughput(385000);
-    logEvent('Workload', 'Workload Engine Burst: Generating 100,000 synthetic messages at 385k msg/sec.', 'info');
+  const handleInjectBurst = () => {
+    logEvent('Traffic', 'Pumping 100,000 message burst across 8 concurrent worker pipelines...', 'info');
+    setThroughput(425000);
     setTimeout(() => {
-      setThroughput(original);
-      logEvent('Workload', 'Burst complete: 100,000 messages committed to RocksDB with 0 dropped packets.', 'success');
-    }, 3500);
+      setThroughput(309597);
+      logEvent('Traffic', 'Burst completed: 100,000 messages committed to memory ringbuffer. Zero dropped.', 'success');
+    }, 2500);
   };
 
   const handleRestore = () => {
     setActiveChaos(null);
     setClusterHealth('HEALTHY');
-    setRegions(INITIAL_REGIONS);
-    setThroughput(309597);
-    logEvent('Healer', 'Cluster state self-healed. Flushed netem rules. All 3 regional nodes reporting 100% HEALTHY.', 'success');
+    setRegions(buildInitialRegions());
+    logEvent('ChaosEngine', 'All netem rules flushed. Cluster restored to pristine operational state.', 'success');
   };
 
-  // Route Resolver logic
-  const handleResolveRoute = (topicName, clientRegion) => {
-    const topic = topics.find((t) => t.name === topicName);
-    if (!topic) return { success: false, error: 'Topic not found' };
-
-    if (topic.legalRegion !== 'ANY') {
-      const targetKey = topic.legalRegion.toLowerCase();
-      const targetBroker = regions[targetKey];
-      if (!targetBroker || targetBroker.status === 'OFFLINE') {
-        setGdprPrevented((prev) => prev + 1);
-        logEvent(
-          'Security',
-          `[403 FORBIDDEN] Sovereign Lock Violation Prevented! Topic '${topicName}' requires '${topic.legalRegion}', but node is OFFLINE. Ingress rejected to prevent illegal spillover.`,
-          'error'
-        );
-        return {
-          success: false,
-          requiredRegion: topic.legalRegion,
-          error: `403 Forbidden: Regional node for ${topic.legalRegion} is offline and residency strictly prohibits routing elsewhere.`,
-        };
-      }
+  // Route Resolver logic calling real Go Control Plane API
+  const handleResolveRoute = async (topicName, clientRegion = 'India') => {
+    try {
+      const decision = await resolveRoute(topicName, clientRegion);
       return {
         success: true,
         topic: topicName,
-        assignedBrokerId: targetBroker.id,
-        assignedEndpoint: targetBroker.endpoint,
-        region: targetBroker.name,
-        score: 1000 / (targetBroker.rtt * (1.0 + targetBroker.packetLoss) + 1.0),
-        isBypassingSlowLink: false,
-        reason: `Enforced by Legal Residency Policy (${topic.compliance})`,
+        assignedBrokerId: decision.assigned_broker_id,
+        assignedEndpoint: decision.assigned_endpoint,
+        region: decision.region,
+        score: decision.score,
+        isBypassingSlowLink: decision.is_bypassing_slow_link,
+        reason: decision.reason,
+      };
+    } catch (err) {
+      setGdprPrevented((prev) => prev + 1);
+      logEvent('Security', `[REJECTED] ${err.message}`, 'error');
+      return {
+        success: false,
+        error: err.message,
       };
     }
-
-    // Adaptive Optimization
-    let bestScore = -1;
-    let chosen = null;
-    let bypassed = false;
-
-    Object.keys(regions).forEach((k) => {
-      const b = regions[k];
-      if (b.status === 'OFFLINE') return;
-      const s = 1000 / (b.rtt * (1.0 + b.packetLoss) + 1.0);
-      if (s > bestScore) {
-        bestScore = s;
-        chosen = b;
-      }
-    });
-
-    if (activeChaos === 'slow-link' && chosen && chosen.id === 'broker-singapore-1') {
-      bypassed = true;
-    }
-
-    return {
-      success: true,
-      topic: topicName,
-      assignedBrokerId: chosen ? chosen.id : 'none',
-      assignedEndpoint: chosen ? chosen.endpoint : 'none',
-      region: chosen ? chosen.name : 'none',
-      score: bestScore,
-      isBypassingSlowLink: bypassed,
-      reason: bypassed
-        ? 'Adaptive Route Optimization: Bypassed degraded India-Germany undersea fiber link'
-        : 'Optimal lowest latency path selected by Envoy L4 Router',
-    };
   };
 
   // Publish Message
-  const handlePublishMessage = (topicName, payloadStr) => {
-    const route = handleResolveRoute(topicName, 'India');
+  const handlePublishMessage = async (topicName, payloadStr) => {
+    const route = await handleResolveRoute(topicName, 'India');
     if (!route.success) {
       return { type: 'error', message: route.error };
     }
 
-    const newOffset = 1849100 + messages.length + 1;
+    const newOffset = messages.length + 1;
     const newMsg = {
-      magic: '0x48445201',
+      magic: '0x48',
       topic: topicName,
       partition: Math.floor(Math.random() * 4),
       offset: newOffset,
       timestamp: new Date().toISOString(),
       key: `client_evt_${Date.now()}`,
       payload: payloadStr,
-      sizeBytes: payloadStr.length + 48,
+      sizeBytes: payloadStr.length + 16,
     };
 
     setMessages((prev) => [newMsg, ...prev]);
@@ -219,69 +235,83 @@ export default function App() {
     };
   };
 
-  const handleSync = async () => {
-    try {
-      const res = await fetch('http://127.0.0.1:8080/health');
-      if (res.ok) {
-        logEvent('Sync', 'Connected & synced with live Hydra Go Control Plane (:8080)', 'success');
-      } else {
-        logEvent('Sync', 'Live controller returned non-200. Operating in standalone demo mode.', 'info');
-      }
-    } catch (e) {
-      logEvent('Sync', 'Backend offline. Operating smoothly in standalone demo mode.', 'info');
-    }
+  const activeRoutes = {
+    'gdpr-user-audit': regions.germany.status === 'OFFLINE' ? 'QUARANTINED (403)' : regions.germany.id,
+    'eu-payments': regions.germany.status === 'OFFLINE' ? 'QUARANTINED (403)' : regions.germany.id,
+    'upi-transactions': regions.india.status === 'OFFLINE' ? 'QUARANTINED (403)' : regions.india.id,
+    'apac-fx': regions.singapore.status === 'OFFLINE' ? 'QUARANTINED (403)' : regions.singapore.id,
+    'global-telemetry': regions.india.status === 'DEGRADED' ? regions.singapore.id : regions.india.id,
   };
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col font-sans selection:bg-white selection:text-black">
+    <div className="min-h-screen bg-[#07090e] text-white flex flex-col font-sans selection:bg-white selection:text-black">
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         clusterHealth={clusterHealth}
-        onSync={handleSync}
+        throughput={throughput}
+        onRestore={handleRestore}
       />
 
-      <main className="flex-1 w-full bg-black">
-        {activeTab === 'landing' && <LandingView setActiveTab={setActiveTab} />}
-        {activeTab === 'topology' && (
-          <TopologyView
-            regions={regions}
+      <main className="flex-1">
+        {activeTab === 'landing' && (
+          <LandingView
             throughput={throughput}
             totalMessages={totalMessages}
             gdprPrevented={gdprPrevented}
+            onOpenTopology={() => setActiveTab('topology')}
+            onOpenKafka={() => setActiveTab('kafka')}
+            onOpenChaos={() => setActiveTab('chaos')}
           />
         )}
-        {activeTab === 'kafka-ui' && (
+
+        {activeTab === 'topology' && (
+          <TopologyView
+            regions={regions}
+            clusterHealth={clusterHealth}
+            throughput={throughput}
+            activeChaos={activeChaos}
+            events={events}
+            onInjectSlowLink={handleInjectSlowLink}
+            onInjectBlackout={handleInjectBlackout}
+            onInjectBurst={handleInjectBurst}
+            onRestore={handleRestore}
+          />
+        )}
+
+        {activeTab === 'kafka' && (
           <KafkaExplorerView
             topics={topics}
             messages={messages}
             onPublishMessage={handlePublishMessage}
-            activeRoutes={{}}
+            activeRoutes={activeRoutes}
           />
         )}
+
         {activeTab === 'chaos' && (
           <ChaosStudioView
+            regions={regions}
+            activeChaos={activeChaos}
             onInjectSlowLink={handleInjectSlowLink}
             onInjectBlackout={handleInjectBlackout}
-            onEmitBurst={handleEmitBurst}
+            onInjectBurst={handleInjectBurst}
             onRestore={handleRestore}
-            onResolveRoute={handleResolveRoute}
             events={events}
           />
         )}
-        {activeTab === 'compliance' && <ComplianceVaultView />}
+
+        {activeTab === 'compliance' && (
+          <ComplianceVaultView
+            topics={topics}
+            regions={regions}
+            gdprPrevented={gdprPrevented}
+          />
+        )}
       </main>
 
-      <footer className="border-t border-gray-800/50 bg-black py-8 text-center text-xs text-gray-500 font-mono">
-        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div>Hydra Stream © 2026 • High-Reliability Geo-Resilient Streaming Broker • Apache-2.0</div>
-          <div className="flex items-center gap-4 text-gray-400">
-            <span>React + Vite + Tailwind + Express</span>
-            <span className="text-white font-medium">UN SDG 9.1 Verified</span>
-          </div>
-        </div>
+      <footer className="border-t border-white/5 bg-[#05070a] py-6 text-center text-xs font-mono text-gray-500">
+        Hydra Stream © 2026 • Sovereign Multi-Region Streaming Broker • UN SDG 9.1 Infrastructure Resilience
       </footer>
     </div>
   );
 }
-

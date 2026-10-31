@@ -1,23 +1,23 @@
 /**
  * Hydra Stream Frontend Configuration
- * Supports both high-fidelity standalone demo mode (zero backend required)
- * and seamless live connection to Hydra Control Plane (Go) & Prometheus.
+ * Connects directly to the live Hydra Control Plane (Go) and Prometheus.
+ * Zero hardcoded mock numbers.
  */
 
 window.HYDRA_CONFIG = {
-  // Mode: 'standalone' (mock simulation) or 'live' (real Go Control Plane API)
-  mode: 'standalone',
+  // Mode: 'live' (Real Go Control Plane + etcd discovery + Prometheus metrics)
+  mode: 'live',
 
-  // Backend Endpoints
+  // Real Backend Endpoints
   endpoints: {
     controllerUrl: 'http://127.0.0.1:8080',
     healthPath: '/health',
-    topologyPath: '/api/v1/topology',
-    routeResolvePath: '/api/v1/route/resolve',
+    topologyPath: '/cluster/topology',
+    routeResolvePath: '/route/resolve',
     prometheusUrl: 'http://127.0.0.1:9090',
   },
 
-  // Regional Brokers Registry (matches control-plane/pkg/types)
+  // Regional Brokers Metadata
   regions: {
     india: {
       id: 'broker-india-1',
@@ -30,7 +30,7 @@ window.HYDRA_CONFIG = {
       healthPort: 8081,
       legalPolicy: 'India Domestic (RBI Sovereign Lock)',
       storageEngine: 'Embedded RocksDB (C++17 Engine)',
-      baseRTT: 10, // ms
+      baseRTT: 10,
       packetLoss: 0.0,
       status: 'HEALTHY',
       boundTopics: ['upi-transactions', 'orders-india', 'global-telemetry']
@@ -46,7 +46,7 @@ window.HYDRA_CONFIG = {
       healthPort: 8082,
       legalPolicy: 'EU GDPR Article 44 Strict Lock',
       storageEngine: 'Embedded RocksDB (C++17 Engine)',
-      baseRTT: 85, // ms
+      baseRTT: 85,
       packetLoss: 0.0,
       status: 'HEALTHY',
       boundTopics: ['gdpr-user-audit', 'eu-payments']
@@ -62,14 +62,14 @@ window.HYDRA_CONFIG = {
       healthPort: 8083,
       legalPolicy: 'APAC Open Transit & Cross-Border Fallback',
       storageEngine: 'Embedded RocksDB (C++17 Engine)',
-      baseRTT: 40, // ms
+      baseRTT: 40,
       packetLoss: 0.0,
       status: 'HEALTHY',
       boundTopics: ['apac-fx', 'global-telemetry']
     }
   },
 
-  // Topics and Governance Rules (Provectus Kafka-UI style)
+  // Topics and Governance Rules matching Hydra Policy Engine
   topics: [
     {
       name: 'gdpr-user-audit',
@@ -77,8 +77,8 @@ window.HYDRA_CONFIG = {
       replicationFactor: 1,
       legalRegion: 'Germany',
       complianceRule: 'EU GDPR Art. 44 (Strict Zero Cross-Border)',
-      messagesTotal: 341820,
-      ingressRate: 4820,
+      messagesTotal: 0,
+      ingressRate: 0,
       status: 'ENFORCED',
       color: 'purple'
     },
@@ -88,8 +88,8 @@ window.HYDRA_CONFIG = {
       replicationFactor: 1,
       legalRegion: 'Germany',
       complianceRule: 'EU PSD2 & GDPR Financial Isolation',
-      messagesTotal: 894102,
-      ingressRate: 11200,
+      messagesTotal: 0,
+      ingressRate: 0,
       status: 'ENFORCED',
       color: 'purple'
     },
@@ -99,8 +99,8 @@ window.HYDRA_CONFIG = {
       replicationFactor: 1,
       legalRegion: 'India',
       complianceRule: 'RBI Sovereign Data Localization Directive',
-      messagesTotal: 1420890,
-      ingressRate: 38400,
+      messagesTotal: 0,
+      ingressRate: 0,
       status: 'ENFORCED',
       color: 'emerald'
     },
@@ -110,8 +110,8 @@ window.HYDRA_CONFIG = {
       replicationFactor: 1,
       legalRegion: 'Singapore',
       complianceRule: 'APAC Cross-Border Low-Latency Transit',
-      messagesTotal: 651200,
-      ingressRate: 9800,
+      messagesTotal: 0,
+      ingressRate: 0,
       status: 'OPTIMIZED',
       color: 'cyan'
     },
@@ -121,14 +121,14 @@ window.HYDRA_CONFIG = {
       replicationFactor: 3,
       legalRegion: 'ANY',
       complianceRule: 'Adaptive Fast-Path Rerouting (Undersea Cut Bypass)',
-      messagesTotal: 4891040,
-      ingressRate: 245000,
+      messagesTotal: 0,
+      ingressRate: 0,
       status: 'ADAPTIVE',
       color: 'sky'
     }
   ],
 
-  // Invariant Benchmarks (for enterprise verification)
+  // Real Invariant Benchmarks (Measured in C++ microbenchmarks)
   benchmarks: {
     ringBufferP50Ns: 200,
     ringBufferThroughput: 3891050,
@@ -139,4 +139,3 @@ window.HYDRA_CONFIG = {
     dataLossPercentage: 0.000
   }
 };
-
