@@ -1,124 +1,66 @@
-# 07 — Observability and Metrics
+# 07 — Observability, Metrics & Event Ledger
 
-## 1. Goals
+## 1. Observability Goals
 
-Measure both system behavior and simulator health. A benchmark result is invalid or qualified if the workload generator, event collector or metrics pipeline becomes a bottleneck.
+Measuring geo-distributed streaming systems requires observability across three dimensions:
+1. **Application Latency**: Client produce latency, fetch latency, and end-to-end processing times.
+2. **Inter-Region Network Health**: Round-trip time (RTT), jitter, and packet drop rates tracked via **Prometheus**.
+3. **Data Residency Compliance**: Real-time auditing of which broker jurisdictions handle which topics.
 
-## 2. Metric categories
+---
 
-### Workload
+## 2. Cross-Region Metric Categories
 
-- Send attempts per second.
-- Successful acknowledgements per second.
-- Fetch/delivery rate.
-- Processing rate.
-- Producer error and timeout rates.
-- Consumer error rate.
-- In-flight requests.
-- Scheduled versus actual send rate.
+### 2.1 Prometheus Inter-Region Network Metrics
+* `hydra_link_rtt_seconds{source="India", target="Germany"}`: Scraped by Prometheus to detect slow links.
+* `hydra_link_packet_loss_ratio{source="India", target="Germany"}`: Injected loss indicator.
+* `hydra_route_status{source="India", target="Germany"}`: State enum (`0=HEALTHY`, `1=DEGRADED`, `2=OFFLINE`).
 
-### Latency
+### 2.2 Broker In-Memory Health Metrics
+* `hydra_broker_queue_depth{region="Germany"}`: Current in-memory queue size (bounded memory).
+* `hydra_broker_backpressure_active{region="Germany"}`: 1 if condition variable `not_full` is blocking producers.
+* `hydra_broker_produced_total{region="India"}`: Total produced messages.
+* `hydra_broker_consumed_total{region="India"}`: Total consumed messages.
 
-Measure separately:
+---
 
-- Producer request latency.
-- Producer acknowledgement latency.
-- Consumer fetch latency.
-- End-to-end delivery latency, where message timestamps and clock assumptions permit it.
-- Processing duration.
-- Recovery duration.
+## 3. Structured Event Envelope (`events.jsonl`)
 
-Use monotonic timestamps for same-process duration measurements. Cross-process end-to-end latency requires a documented clock-synchronization assumption or a request/response measurement that avoids unsynchronized clock subtraction.
-
-### Broker and cluster
-
-Where available from broker metrics:
-
-- Broker health.
-- Request counts and errors.
-- Queue depth.
-- Consumer lag.
-- Disk and memory use.
-- Replication offset and lag.
-- Partition leader/follower state.
-
-Do not fabricate metrics that the broker does not expose. Missing metrics should be marked unavailable.
-
-### Faults
-
-- Fault scheduled time.
-- Fault action start/end.
-- Fault recovery start/end.
-- Target broker.
-- Action outcome.
-- Observed health transition.
-
-## 3. Percentiles
-
-Report P50, P95 and P99 from the full sample distribution or a mergeable histogram with documented precision. Never average worker-level percentiles to derive a global percentile.
-
-For high-volume workloads, use a histogram implementation with bounded memory and known error characteristics.
-
-## 4. Event envelope
-
-Proposed JSONL event:
+Every action taken by producers, consumers, and the fault injector emits a versioned JSONL event:
 
 ```json
 {
   "schema_version": 1,
-  "run_id": "exp-2026-0001",
-  "event_id": "evt-000001",
-  "source": "workload",
+  "run_id": "exp-geo-001",
+  "event_id": "evt-00042",
+  "source": "producer-de-1",
   "event_type": "produce.acknowledged",
-  "wall_time": "2026-10-31T10:00:00.000Z",
-  "elapsed_ns": 1250000000,
+  "wall_time": "2026-10-31T14:30:00.125Z",
+  "elapsed_ns": 4500000000,
   "attributes": {
-    "producer_id": 2,
+    "topic": "eu-medical",
+    "legal_region": "Germany",
+    "actual_broker_region": "Germany",
     "sequence_number": 105,
-    "partition_id": 0,
-    "offset": 9001,
-    "latency_ns": 2400000
+    "assigned_offset": 5041,
+    "latency_ns": 4200000
   }
 }
 ```
 
-Use stable event names and version the envelope. Large payloads must not be copied into event records.
+---
 
-## 5. Run artifact layout
+## 4. Run Artifact Layout
+
+At the conclusion of an experiment, all outputs are consolidated in `results/<run-id>/`:
 
 ```text
-results/
-└── <run-id>/
-    ├── scenario.original.yaml
-    ├── scenario.normalized.yaml
-    ├── metadata.json
-    ├── events.jsonl
-    ├── metrics.json
-    ├── assertions.json
-    ├── report.json
-    └── report.md
+results/<run-id>/
+├── scenario.normalized.yaml    # Normalized YAML scenario definition
+├── metadata.json               # Environment & build metadata
+├── events.jsonl                # Full streaming event ledger
+├── prometheus_metrics.json     # Inter-region RTT & loss timeseries
+├── assertions.json             # Correctness Oracle invariant results
+├── report.json                 # Machine-readable output (P50/P95/P99, throughput)
+└── report.md                   # Human-readable executive summary
 ```
-
-## 6. Report sections
-
-- Run identity and status.
-- Scenario and seed.
-- Source/build/environment metadata.
-- Cluster topology.
-- Workload configuration and achieved rate.
-- Fault timeline.
-- Throughput and latency.
-- Errors and timeouts.
-- Broker metrics available.
-- Correctness assertion results.
-- Generator/collector health.
-- Cleanup outcome.
-- Limitations and unavailable measurements.
-
-## 7. Measurement integrity
-
-- Record generator saturation and missed send deadlines.
-- Bound event queues and expose dropped-event counters.
-- If observations are dropped, mark affected assertions inconclusive.
-- Record CPU and memory overhead of the simulator where feasible.
-- Do not compare runs with materially different environment metadata without calling out the difference.

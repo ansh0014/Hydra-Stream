@@ -1,87 +1,30 @@
-# 12 — Testing and Safety
+# 12 — Testing Strategy & Safety Controls
 
-## 1. Test layers
+## 1. Multi-Tier Testing Strategy
 
-### Unit tests
+Hydra Stream incorporates tests across four verification tiers:
 
-- YAML parsing and validation.
-- Experiment state transitions.
-- Scheduler ordering and late-event behavior.
-- Message ID generation.
-- Rate limiter behavior.
-- Histogram calculations.
-- Event schema validation.
-- Oracle reconciliation.
-- Fault registry and recovery bookkeeping.
+### 1.1 Unit Tests
+* **C++ Engine**: Bounded concurrent queue thread-safety, dual condition variable backpressure, thread pool dispatching, and logger queue throughput (`Hydrosync/tests/`).
+* **Go Control Plane**: YAML schema validation, dynamic `etcd` discovery parser, and residency policy rules.
 
-### Integration tests
+### 1.2 Integration Tests
+* **Dynamic Registration**: Spin up `etcd` and verify broker nodes in India, Germany, and Singapore register dynamic TTL leases.
+* **TCP Wire Protocol**: Verify clients can connect over TCP, push messages, and fetch by sequential offset.
+* **Prometheus Scraping**: Ensure Prometheus successfully scrapes health endpoints on ports `8081`, `8082`, `8083`.
 
-- Controller launches workload process.
-- Workload connects to broker.
-- Producer acknowledgement is observed.
-- Consumer delivery is observed.
-- Broker stop/start is executed against test cluster.
-- Report is generated after normal completion.
-- Partial report is generated after failure.
+### 1.3 Chaos & Fault Tests
+* **Slow-Link Injection**: Apply `tc netem` latency between India and Germany; verify the Control Plane dynamically detects the degradation and updates routing weights.
+* **Regional Blackout**: Stop the Singapore broker container; verify that India and Germany continue accepting writes without freezing.
 
-### Stress tests
+### 1.4 Regulatory Compliance & Invariant Verification (Oracle)
+* Automated audit verifying that 100% of messages for `legal_region: Germany` were processed strictly within Germany.
+* Mathematical verification of zero acknowledged message loss.
 
-- High producer count.
-- Slow consumer.
-- Bounded event queue.
-- Collector overload.
-- Long-duration workload.
-- Controller cancellation during active fault.
+---
 
-### Fault tests
+## 2. Safety & Containment Controls
 
-- Broker process killed.
-- Broker container stopped.
-- Broker restart delayed.
-- Fault action fails.
-- Recovery action fails.
-- Controller exits while fault is active.
-- Docker daemon unavailable.
-
-## 2. Simulator safety model
-
-The simulator can disrupt services. Therefore:
-
-- Destructive operations require a disposable test environment.
-- The target Compose project must match the run configuration.
-- Container labels and expected service names must be checked.
-- Never use broad `docker stop $(docker ps ...)` commands.
-- Never alter host-wide network configuration in the MVP.
-- Never fill the host filesystem.
-- Use dedicated test volumes and resource limits.
-- Require explicit opt-in for network and storage faults.
-- Log every action and its target.
-
-## 3. Cleanup guarantees
-
-The controller tracks:
-- Child processes it started.
-- Containers it created or explicitly adopted.
-- Faults it applied.
-- Network rules it installed.
-- Temporary files and artifact directories.
-
-Cleanup may only remove resources it can positively identify as owned by the run or simulator project.
-
-## 4. Failure handling
-
-A failed experiment should still preserve:
-- Original and normalized scenario.
-- Run metadata.
-- Events collected so far.
-- Fault action history.
-- Error details.
-- Cleanup result.
-
-Never convert missing data into zero-valued success metrics.
-
-## 5. Reproducibility limits
-
-A fixed seed reproduces random workload choices and generated scenario inputs. It cannot guarantee identical operating-system scheduling, CPU contention, disk timing, network timing or thread interleavings.
-
-Reports should record environment metadata and avoid claiming bit-for-bit deterministic execution.
+1. **Disposable Environment Requirement**: All destructive actions (container stops, `tc netem` rules) will fail fast unless `require_disposable_environment: true` is explicitly set in the scenario.
+2. **Namespace Isolation**: `tc netem` rules are applied **only** inside specific Docker container network namespaces (`eth0`), never altering host-wide networking.
+3. **Automatic Recovery on Abort**: If an experiment is interrupted (`Ctrl+C` / `SIGINT`), the controller intercepts the signal, removes any active `tc` rules, and restores all stopped containers before exiting.
