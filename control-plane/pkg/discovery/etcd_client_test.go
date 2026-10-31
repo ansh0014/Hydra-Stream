@@ -76,7 +76,10 @@ func TestEtcdClient_GrantLeaseAndFetch(t *testing.T) {
 		}
 	})
 
-	client := NewEtcdClient([]string{"http://mock-etcd:2379"}, 2*time.Second)
+	client, err := NewEtcdClient([]string{"http://mock-etcd:2379"}, 2*time.Second)
+	if err != nil {
+		t.Fatalf("NewEtcdClient error: %v", err)
+	}
 	client.httpClient.Transport = mockTransport
 	ctx := context.Background()
 
@@ -104,5 +107,12 @@ func TestEtcdClient_GrantLeaseAndFetch(t *testing.T) {
 	}
 	if len(brokers) != 1 || brokers[0].ID != "broker-india-1" {
 		t.Fatalf("expected 1 broker, got: %+v", brokers)
+	}
+}
+
+func TestEtcdClient_MissingEndpointsError(t *testing.T) {
+	_, err := NewEtcdClient(nil, 1*time.Second)
+	if err == nil {
+		t.Fatalf("expected error when no endpoints provided and ETCD_ENDPOINTS is empty")
 	}
 }

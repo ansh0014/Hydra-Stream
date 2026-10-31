@@ -3,10 +3,13 @@ package metrics
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/hydra-stream/control-plane/pkg/discovery"
@@ -18,9 +21,15 @@ type PrometheusClient struct {
 	httpClient *http.Client
 }
 
-func NewPrometheusClient(serverURL string, timeout time.Duration) *PrometheusClient {
+// NewPrometheusClient initializes a Prometheus client using serverURL or PROMETHEUS_URL environment variable.
+// Returns an error if serverURL is missing or empty.
+func NewPrometheusClient(serverURL string, timeout time.Duration) (*PrometheusClient, error) {
 	if serverURL == "" {
-		serverURL = "http://127.0.0.1:9090"
+		serverURL = os.Getenv("PROMETHEUS_URL")
+	}
+	serverURL = strings.TrimSpace(serverURL)
+	if serverURL == "" {
+		return nil, errors.New("cannot initialize prometheus client: serverURL is required or must be set in PROMETHEUS_URL")
 	}
 	if timeout <= 0 {
 		timeout = 3 * time.Second
@@ -30,7 +39,7 @@ func NewPrometheusClient(serverURL string, timeout time.Duration) *PrometheusCli
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
-	}
+	}, nil
 }
 
 type PromQueryResult struct {

@@ -10,6 +10,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/hydra-stream/control-plane/pkg/config"
 	"github.com/hydra-stream/control-plane/pkg/discovery"
 	"github.com/hydra-stream/control-plane/pkg/metrics"
 	"github.com/hydra-stream/control-plane/pkg/policy"
@@ -18,6 +19,7 @@ import (
 )
 
 type ControllerServer struct {
+	cfg          *config.Config
 	registry     *discovery.Registry
 	policyEngine *policy.PolicyEngine
 	router       *routing.Router
@@ -25,13 +27,13 @@ type ControllerServer struct {
 	promClient   *metrics.PrometheusClient
 }
 
-func NewControllerServer(seedDefaults bool) *ControllerServer {
+func NewControllerServer(cfg *config.Config) *ControllerServer {
 	reg := discovery.NewRegistry(30 * time.Second)
 	pe := policy.NewPolicyEngine()
 	r := routing.NewRouter(reg, pe)
 
-	if seedDefaults {
-		// Fallback seed topology when running without live etcd cluster
+	if cfg.SeedFallback {
+		log.Println("[Hydra Controller] Pre-seeding fallback topology (SEED_FALLBACK=true)...")
 		reg.Register(types.BrokerNode{
 			ID:         "broker-india",
 			Region:     "India",
@@ -59,6 +61,7 @@ func NewControllerServer(seedDefaults bool) *ControllerServer {
 	}
 
 	return &ControllerServer{
+		cfg:          cfg,
 		registry:     reg,
 		policyEngine: pe,
 		router:       r,
@@ -154,29 +157,64 @@ func (s *ControllerServer) handleLatencyInject(w http.ResponseWriter, r *http.Re
 }
 
 func main() {
-	port := flag.Int("port", 8080, "Port for Hydra Controller HTTP API")
-	etcdEndpoint := flag.String("etcd", "http://127.0.0.1:2379", "etcd v3 endpoint URL")
-	promEndpoint := flag.String("prometheus", "http://127.0.0.1:9090", "Prometheus API endpoint URL")
-	enableEtcd := flag.Bool("enable-etcd", true, "Enable dynamic discovery via etcd watcher")
-	enableProm := flag.Bool("enable-prom", true, "Enable live latency scraping via Prometheus")
-	seedFallback := flag.Bool("seed-fallback", true, "Pre-seed fallback topology if external cluster is offline")
+	envFile := flag.String("env", "config/hydra.env", "Path to environment config file")
+	portFlag := flag.Int("port", 0, "Override port for HTTP API")
+	etcdFlag := flag.String("etcd", "", "Override etcd v3 endpoint URLs (comma-separated)")
+	promFlag := flag.String("prometheus", "", "Override Prometheus URL")
+	seedFallbackFlag := flag.Bool("seed-fallback", false, "Override seed fallback flag")
 	flag.Parse()
 
-	server := NewControllerServer(*seedFallback)
-	ctx := context.Background()
-
-	// 1. Open Source Integration: etcd dynamic discovery watcher
-	if *enableEtcd {
-		log.Printf("[Hydra Controller] Connecting to etcd v3 at %s...\n", *etcdEndpoint)
-		server.etcdClient = discovery.NewEtcdClient([]string{*etcdEndpoint}, 3*time.Second)
-		server.etcdClient.StartWatcher(ctx, server.registry, 2*time.Second)
+	// 1. Load config layered from file & environment
+	cfg, err := config.LoadConfig(*envFile)
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v\n", err)
 	}
 
-	// 2. Open Source Integration: Prometheus live link latency scraper
-	if *enableProm {
-		log.Printf("[Hydra Controller] Connecting to Prometheus at %s...\n", *promEndpoint)
-		server.promClient = metrics.NewPrometheusClient(*promEndpoint, 3*time.Second)
-		server.promClient.StartMetricsScraper(ctx, server.registry, 2*time.Second)
+	// Apply CLI overrides if explicitly passed
+	if *portFlag > 0 {
+		cfg.Port = *portFlag
+	}
+	if *etcdFlag != "" {
+		cfg.EtcdEndpoints = []string{*etcdFlag}
+	}
+	if *promFlag != "" {
+		cfg.PrometheusURL = *promFlag
+	}
+	if *seedFallbackFlag {
+		cfg.SeedFallback = true
+	}
+
+	// Validate required environment settings
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("Configuration validation failed: %v\n", err)
+	}
+
+	log.Printf("[Hydra Controller] Starting with config: Port=%d, etcd=%v, Prometheus=%s\n",
+		cfg.Port, cfg.EtcdEndpoints, cfg.PrometheusURL)
+
+	server := NewControllerServer(cfg)
+	ctx := context.Background()
+
+	// 2. Start dynamic etcd watcher
+	if cfg.EnableEtcd && len(cfg.EtcdEndpoints) > 0 {
+		etcdCli, err := discovery.NewEtcdClient(cfg.EtcdEndpoints, 3*time.Second)
+		if err != nil {
+			log.Fatalf("Failed to initialize etcd client: %v\n", err)
+		}
+		server.etcdClient = etcdCli
+		server.etcdClient.StartWatcher(ctx, server.registry, cfg.SyncInterval)
+		log.Printf("[Hydra Controller] etcd dynamic discovery watcher active on %v\n", cfg.EtcdEndpoints)
+	}
+
+	// 3. Start live Prometheus metrics scraper
+	if cfg.EnablePrometheus && cfg.PrometheusURL != "" {
+		promCli, err := metrics.NewPrometheusClient(cfg.PrometheusURL, 3*time.Second)
+		if err != nil {
+			log.Fatalf("Failed to initialize prometheus client: %v\n", err)
+		}
+		server.promClient = promCli
+		server.promClient.StartMetricsScraper(ctx, server.registry, cfg.SyncInterval)
+		log.Printf("[Hydra Controller] Prometheus live metrics scraper active on %s\n", cfg.PrometheusURL)
 	}
 
 	http.HandleFunc("/health", server.handleHealth)
@@ -184,8 +222,8 @@ func main() {
 	http.HandleFunc("/route/resolve", server.handleRouteResolve)
 	http.HandleFunc("/simulation/latency", server.handleLatencyInject)
 
-	addr := fmt.Sprintf(":%d", *port)
-	log.Printf("[Hydra Control Plane] Starting coordinator daemon on %s...\n", addr)
+	addr := fmt.Sprintf(":%d", cfg.Port)
+	log.Printf("[Hydra Control Plane] Coordinator daemon listening on %s...\n", addr)
 	if err := http.ListenAndServe(addr, nil); err != nil {
 		log.Fatalf("Server error: %v\n", err)
 		os.Exit(1)

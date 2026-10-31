@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -16,17 +18,30 @@ import (
 )
 
 // EtcdClient provides a direct, dependency-free client for etcd v3
-// using etcd's official gRPC-HTTP Gateway API (port 2379).
+// using etcd's official gRPC-HTTP Gateway API.
 type EtcdClient struct {
 	endpoints  []string
 	httpClient *http.Client
 	mu         sync.RWMutex
 }
 
-func NewEtcdClient(endpoints []string, timeout time.Duration) *EtcdClient {
+// NewEtcdClient initializes an etcd client using provided endpoints or ETCD_ENDPOINTS environment variable.
+// Returns an error if no endpoints are provided or found in the environment.
+func NewEtcdClient(endpoints []string, timeout time.Duration) (*EtcdClient, error) {
 	if len(endpoints) == 0 {
-		endpoints = []string{"http://127.0.0.1:2379"}
+		if envVal := os.Getenv("ETCD_ENDPOINTS"); envVal != "" {
+			for _, ep := range strings.Split(envVal, ",") {
+				if t := strings.TrimSpace(ep); t != "" {
+					endpoints = append(endpoints, t)
+				}
+			}
+		}
 	}
+
+	if len(endpoints) == 0 {
+		return nil, errors.New("cannot initialize etcd client: no endpoints provided or configured in ETCD_ENDPOINTS")
+	}
+
 	if timeout <= 0 {
 		timeout = 5 * time.Second
 	}
@@ -35,7 +50,7 @@ func NewEtcdClient(endpoints []string, timeout time.Duration) *EtcdClient {
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
-	}
+	}, nil
 }
 
 // GrantLease creates a dynamic lease with TTL seconds.

@@ -50,7 +50,10 @@ func TestPrometheusClient_QueryRTTSeconds(t *testing.T) {
 		}
 	})
 
-	client := NewPrometheusClient("http://mock-prometheus:9090", 2*time.Second)
+	client, err := NewPrometheusClient("http://mock-prometheus:9090", 2*time.Second)
+	if err != nil {
+		t.Fatalf("NewPrometheusClient error: %v", err)
+	}
 	client.httpClient.Transport = mockTransport
 	ctx := context.Background()
 
@@ -62,5 +65,12 @@ func TestPrometheusClient_QueryRTTSeconds(t *testing.T) {
 	expectedMs := int64(12)
 	if rtt.Milliseconds() != expectedMs {
 		t.Fatalf("expected ~12ms RTT, got %v", rtt)
+	}
+}
+
+func TestPrometheusClient_MissingURLError(t *testing.T) {
+	_, err := NewPrometheusClient("", 1*time.Second)
+	if err == nil {
+		t.Fatalf("expected error when serverURL is empty and PROMETHEUS_URL is not set")
 	}
 }
