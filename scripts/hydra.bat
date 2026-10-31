@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 :: =====================================================================
-::  Hydra Stream - Unified Multi-Region Operations Manager (CMD)
+::  Hydra Stream - All-In-One Minikube & Docker Automated Launcher
 :: =====================================================================
 
 set "SCRIPT_DIR=%~dp0"
@@ -11,24 +11,132 @@ cd /d "%ROOT_DIR%"
 
 set "CMD_ACTION=%~1"
 
-if "%CMD_ACTION%"=="" goto :help
-if /i "%CMD_ACTION%"=="help" goto :help
+:: Default action: Run complete Minikube & Docker deployment end-to-end
+if "%CMD_ACTION%"=="" goto :run_all_minikube
+if /i "%CMD_ACTION%"=="all" goto :run_all_minikube
+if /i "%CMD_ACTION%"=="start" goto :run_all_minikube
+if /i "%CMD_ACTION%"=="run" goto :run_all_minikube
+if /i "%CMD_ACTION%"=="minikube" goto :run_all_minikube
+if /i "%CMD_ACTION%"=="k8s" goto :run_all_minikube
+
+:: Other subcommands
+if /i "%CMD_ACTION%"=="compose" goto :compose_up
 if /i "%CMD_ACTION%"=="up" goto :compose_up
-if /i "%CMD_ACTION%"=="compose-up" goto :compose_up
-if /i "%CMD_ACTION%"=="down" goto :compose_down
-if /i "%CMD_ACTION%"=="compose-down" goto :compose_down
-if /i "%CMD_ACTION%"=="status" goto :compose_status
-if /i "%CMD_ACTION%"=="ps" goto :compose_status
-if /i "%CMD_ACTION%"=="minikube" goto :minikube_deploy
-if /i "%CMD_ACTION%"=="k8s" goto :minikube_deploy
+if /i "%CMD_ACTION%"=="down" goto :cluster_down
+if /i "%CMD_ACTION%"=="stop" goto :cluster_down
+if /i "%CMD_ACTION%"=="status" goto :cluster_status
+if /i "%CMD_ACTION%"=="ps" goto :cluster_status
 if /i "%CMD_ACTION%"=="test" goto :run_tests
 if /i "%CMD_ACTION%"=="chaos" goto :chaos_injection
+if /i "%CMD_ACTION%"=="help" goto :help
 
 echo [ERROR] Unknown command: %CMD_ACTION%
 goto :help
 
 :: ---------------------------------------------------------------------
-:: 1. DOCKER COMPOSE UP
+:: ALL-IN-ONE MINIKUBE & DOCKER CLUSTER LAUNCHER
+:: ---------------------------------------------------------------------
+:run_all_minikube
+echo.
+echo =================================================================
+echo   HYDRA STREAM - ALL-IN-ONE MINIKUBE CLUSTER LAUNCHER
+echo =================================================================
+echo.
+
+:: 1. Check Minikube status and start if not running
+echo [1/6] Verifying Minikube status...
+minikube status >nul 2>&1
+if errorlevel 1 (
+    echo [Minikube] Minikube is not running. Starting Minikube...
+    minikube start
+    if errorlevel 1 (
+        echo [ERROR] Failed to start Minikube. Ensure Docker or your hypervisor is running.
+        pause
+        exit /b 1
+    )
+) else (
+    echo [Minikube] Minikube cluster is already active and healthy.
+)
+
+:: 2. Build Docker Images
+echo.
+echo [2/6] Building Docker Container Images for Hydra Cluster...
+echo   - Building C++ Regional Broker Image (hydra-broker:dev)...
+docker build -t hydra-broker:dev -f broker\Dockerfile broker\
+if errorlevel 1 (
+    echo [ERROR] Failed to build broker Docker image.
+    pause
+    exit /b 1
+)
+
+echo   - Building Sovereign Go Control Plane Image (hydra-controller:dev)...
+docker build -t hydra-controller:dev -f control-plane\Dockerfile control-plane\
+if errorlevel 1 (
+    echo [ERROR] Failed to build control-plane Docker image.
+    pause
+    exit /b 1
+)
+
+echo   - Building React Express Dashboard Image (hydra-frontend:dev)...
+docker build -t hydra-frontend:dev -f frontend\Dockerfile frontend\
+if errorlevel 1 (
+    echo [ERROR] Failed to build frontend Docker image.
+    pause
+    exit /b 1
+)
+
+:: 3. Load Images into Minikube
+echo.
+echo [3/6] Loading Images into Minikube Node...
+echo   - Loading hydra-broker:dev...
+minikube image load hydra-broker:dev
+echo   - Loading hydra-controller:dev...
+minikube image load hydra-controller:dev
+echo   - Loading hydra-frontend:dev...
+minikube image load hydra-frontend:dev
+
+:: 4. Deploy Kubernetes Manifests
+echo.
+echo [4/6] Deploying Kubernetes Infrastructure (Storage, Metrics, Mesh)...
+echo   - Deploying etcd v3 Discovery State Store...
+kubectl apply -f deploy\k8s\etcd\etcd.yaml
+echo   - Deploying Prometheus Live Telemetry Scraper...
+kubectl apply -f deploy\k8s\prometheus\prometheus.yaml
+
+echo.
+echo [5/6] Deploying Regional Brokers, Sovereign Control Plane & Dashboard...
+echo   - Deploying India Regional Broker (Mumbai :9092)...
+kubectl apply -f deploy\k8s\brokers\broker-india.yaml
+echo   - Deploying Germany Regional Broker (Frankfurt :9093 - GDPR Locked)...
+kubectl apply -f deploy\k8s\brokers\broker-germany.yaml
+echo   - Deploying Singapore Regional Broker (Changi :9094)...
+kubectl apply -f deploy\k8s\brokers\broker-singapore.yaml
+echo   - Deploying Hydra Go Control Plane (:8080)...
+kubectl apply -f deploy\k8s\control-plane\controller.yaml
+echo   - Deploying Hydra React Dashboard (:3000)...
+kubectl apply -f deploy\k8s\frontend\frontend.yaml
+
+:: 5. Display Status
+echo.
+echo =================================================================
+echo   Hydra Stream Multi-Region Cluster Deployed Successfully!
+echo =================================================================
+echo.
+echo [Current Pod Status]:
+kubectl get pods -o wide
+echo.
+echo [Cluster Services]:
+kubectl get services
+
+:: 6. Launch Dashboard in Browser
+echo.
+echo [6/6] Launching Hydra Stream Frontend Dashboard in Minikube...
+echo Opening browser connection to hydra-frontend...
+minikube service hydra-frontend
+exit /b 0
+
+:: ---------------------------------------------------------------------
+:: DOCKER COMPOSE ALTERNATIVE
 :: ---------------------------------------------------------------------
 :compose_up
 echo.
@@ -42,7 +150,7 @@ if errorlevel 1 (
 )
 echo.
 echo =================================================================
-echo   [Hydra] Multi-Region Cluster is LIVE!
+echo   [Hydra] Multi-Region Cluster is LIVE via Docker Compose!
 echo =================================================================
 echo   - Frontend UI:     http://localhost:3000
 echo   - Control Plane:   http://localhost:8080/health
@@ -56,61 +164,41 @@ docker-compose -f deploy\compose\docker-compose.yml ps
 exit /b 0
 
 :: ---------------------------------------------------------------------
-:: 2. DOCKER COMPOSE DOWN
+:: CLUSTER TEARDOWN / STOP
 :: ---------------------------------------------------------------------
-:compose_down
+:cluster_down
 echo.
-echo [Hydra] Stopping Hydra Stream cluster containers...
-docker-compose -f deploy\compose\docker-compose.yml down
+echo [Hydra] Tearing down Minikube deployments...
+kubectl delete -f deploy\k8s\frontend\frontend.yaml --ignore-not-found=true
+kubectl delete -f deploy\k8s\control-plane\controller.yaml --ignore-not-found=true
+kubectl delete -f deploy\k8s\brokers\broker-singapore.yaml --ignore-not-found=true
+kubectl delete -f deploy\k8s\brokers\broker-germany.yaml --ignore-not-found=true
+kubectl delete -f deploy\k8s\brokers\broker-india.yaml --ignore-not-found=true
+kubectl delete -f deploy\k8s\prometheus\prometheus.yaml --ignore-not-found=true
+kubectl delete -f deploy\k8s\etcd\etcd.yaml --ignore-not-found=true
+
+echo [Hydra] Stopping Docker Compose if active...
+docker-compose -f deploy\compose\docker-compose.yml down --remove-orphans >nul 2>&1
+echo [Hydra] Cluster stopped cleanly.
 exit /b 0
 
 :: ---------------------------------------------------------------------
-:: 3. CLUSTER STATUS
+:: CLUSTER STATUS
 :: ---------------------------------------------------------------------
-:compose_status
+:cluster_status
+echo.
+echo [Minikube Pods]:
+kubectl get pods -o wide
+echo.
+echo [Minikube Services]:
+kubectl get services
+echo.
+echo [Docker Containers]:
 docker-compose -f deploy\compose\docker-compose.yml ps
 exit /b 0
 
 :: ---------------------------------------------------------------------
-:: 4. MINIKUBE KUBERNETES DEPLOYMENT
-:: ---------------------------------------------------------------------
-:minikube_deploy
-echo.
-echo =================================================================
-echo   [Hydra] Deploying Hydra Stream End-to-End into Minikube
-echo =================================================================
-echo [1/4] Building container images...
-docker build -t hydra-broker:dev -f broker\Dockerfile broker\ || exit /b 1
-docker build -t hydra-controller:dev -f control-plane\Dockerfile control-plane\ || exit /b 1
-docker build -t hydra-frontend:dev -f frontend\Dockerfile frontend\ || exit /b 1
-
-echo [2/4] Loading container images into Minikube...
-minikube image load hydra-broker:dev || exit /b 1
-minikube image load hydra-controller:dev || exit /b 1
-minikube image load hydra-frontend:dev || exit /b 1
-
-echo [3/4] Applying storage and discovery manifests...
-kubectl apply -f deploy\k8s\etcd\etcd.yaml || exit /b 1
-kubectl apply -f deploy\k8s\prometheus\prometheus.yaml || exit /b 1
-
-echo [4/4] Deploying regional brokers, control plane, and frontend...
-kubectl apply -f deploy\k8s\brokers\broker-india.yaml || exit /b 1
-kubectl apply -f deploy\k8s\brokers\broker-germany.yaml || exit /b 1
-kubectl apply -f deploy\k8s\brokers\broker-singapore.yaml || exit /b 1
-kubectl apply -f deploy\k8s\control-plane\controller.yaml || exit /b 1
-kubectl apply -f deploy\k8s\frontend\frontend.yaml || exit /b 1
-
-echo.
-echo =================================================================
-echo   [Hydra] Minikube deployment complete! Pod status:
-echo =================================================================
-kubectl get pods -o wide
-echo.
-echo Run 'minikube service hydra-frontend' to open the UI in your browser.
-exit /b 0
-
-:: ---------------------------------------------------------------------
-:: 5. TEST SUITE
+:: TEST SUITE
 :: ---------------------------------------------------------------------
 :run_tests
 echo.
@@ -121,7 +209,7 @@ powershell -ExecutionPolicy Bypass -File scenarios\run_all.ps1
 exit /b %errorlevel%
 
 :: ---------------------------------------------------------------------
-:: 6. LINUX TC NETEM CHAOS INJECTION
+:: LINUX TC NETEM CHAOS INJECTION
 :: ---------------------------------------------------------------------
 :chaos_injection
 set "CHAOS_CONTAINER=%~2"
@@ -162,21 +250,15 @@ echo =================================================================
 echo   Hydra Stream - Sovereign Geo-Resilient Streaming Broker
 echo =================================================================
 echo.
-echo Usage: scripts\hydra.bat [command]
+echo Simply run without arguments to build and run everything in Minikube:
+echo   scripts\hydra.bat
 echo.
-echo Commands:
-echo   up          Build and start cluster via Docker Compose (detached)
-echo   down        Stop and clean up Docker Compose containers
-echo   status      Show status of running cluster services
-echo   minikube    Build and deploy entire cluster to Minikube Kubernetes
-echo   test        Run end-to-end unit and benchmark test suite
-echo   chaos       Inject or clear Linux tc netem network faults
-echo.
-echo Examples:
-echo   scripts\hydra.bat up
-echo   scripts\hydra.bat status
-echo   scripts\hydra.bat chaos hydra-broker-india apply 260ms 15ms 10%%
-echo   scripts\hydra.bat chaos hydra-broker-india clear
-echo   scripts\hydra.bat down
+echo Available Subcommands:
+echo   scripts\hydra.bat             Build and launch everything in Minikube (Default)
+echo   scripts\hydra.bat status      Inspect Minikube pods and service URLs
+echo   scripts\hydra.bat stop        Tear down Minikube deployments and stop services
+echo   scripts\hydra.bat compose     Run multi-region cluster via Docker Compose instead
+echo   scripts\hydra.bat test        Run unit, benchmark, and routing verification suite
+echo   scripts\hydra.bat chaos       Inject Linux kernel tc netem undersea link latency
 echo =================================================================
 exit /b 0
