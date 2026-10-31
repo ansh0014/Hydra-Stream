@@ -10,8 +10,17 @@ bin/
 *.log
 events.jsonl
 
+# Node / Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+.npm
+
 # IDE and temporary files
 .vscode/
 .idea/
 *.swp
 *~
+.DS_Store
+
