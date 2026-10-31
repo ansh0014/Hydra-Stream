@@ -11,14 +11,14 @@ flowchart LR
     subgraph P1["Phase 1: Broker Daemon & Network Stack"]
         direction TB
         P1_A["Refactor Repo Structure"] --> P1_B["TCP Socket Server & Binary Protocol"]
-        P1_B --> P1_C["Topic Storage & WAL Log Segments"]
+        P1_B --> P1_C["In-Memory Bounded Topic Queues (RAM)"]
         P1_C --> P1_D["HTTP/TCP Health Probe (/health)"]
     end
 
     subgraph P2["Phase 2: 3-Broker Docker Cluster"]
         direction TB
         P2_A["Multi-broker Docker Compose"] --> P2_B["Isolated Bridge Network"]
-        P2_B --> P2_C["Persistent Data Volumes"]
+        P2_B --> P2_C["Container Memory Limits & Env Config"]
         P2_C --> P2_D["Container Healthchecks"]
     end
 
@@ -27,7 +27,7 @@ flowchart LR
         P3_A["Go Experiment Controller"] --> P3_B["C++ High-Throughput Workload Engine"]
         P3_B --> P3_C["Docker Fault Injector (Crash/Restart)"]
         P3_C --> P3_D["Observation Collector (JSONL)"]
-        P3_D --> P3_E["Correctness Oracle & Reconciliation"]
+        P3_D --> P3_E["In-Memory Correctness Oracle & Reconciliation"]
     end
 
     subgraph P4["Phase 4: Advanced Chaos & Production Readiness"]
@@ -53,7 +53,7 @@ flowchart TB
         CFG["Scenario YAML Parser & Validator"]
         SCHED["Monotonic Clock Scheduler"]
         FAULTE["Fault Engine (Docker Adapter)"]
-        ORACLE["Correctness Oracle"]
+        ORACLE["In-Memory Correctness Oracle"]
         METRICS_AGG["Metrics & Histogram Aggregator"]
         REPORT_GEN["Report Generator (JSON/Markdown)"]
 
@@ -84,27 +84,27 @@ flowchart TB
         subgraph BA["Broker A (Leader/Replica)"]
             NET_A["TCP Listener :9092"]
             ENG_A["Broker Engine"]
-            WAL_A["Disk WAL / Storage"]
+            RAM_A["In-Memory ConcurrentQueue"]
             HEALTH_A["Health Probe :8081"]
-            NET_A --> ENG_A --> WAL_A
+            NET_A --> ENG_A --> RAM_A
             ENG_A --> HEALTH_A
         end
 
         subgraph BB["Broker B (Follower/Replica)"]
             NET_B["TCP Listener :9093"]
             ENG_B["Broker Engine"]
-            WAL_B["Disk WAL / Storage"]
+            RAM_B["In-Memory ConcurrentQueue"]
             HEALTH_B["Health Probe :8082"]
-            NET_B --> ENG_B --> WAL_B
+            NET_B --> ENG_B --> RAM_B
             ENG_B --> HEALTH_B
         end
 
         subgraph BC["Broker C (Follower/Replica)"]
             NET_C["TCP Listener :9094"]
             ENG_C["Broker Engine"]
-            WAL_C["Disk WAL / Storage"]
+            RAM_C["In-Memory ConcurrentQueue"]
             HEALTH_C["Health Probe :8083"]
-            NET_C --> ENG_C --> WAL_C
+            NET_C --> ENG_C --> RAM_C
             ENG_C --> HEALTH_C
         end
     end
@@ -159,7 +159,7 @@ sequenceDiagram
     participant C as C++ Workload Client
     participant S as Broker TCP Socket Listener
     participant W as Worker Thread Pool
-    participant T as Topic & WAL Storage
+    participant T as Topic In-Memory Queue
 
     Note over C,S: Connection Establishment (TCP 3-way handshake)
     C->>S: Connect(IP, Port)
@@ -169,7 +169,7 @@ sequenceDiagram
         Note over C,T: Produce Message Flow
         C->>S: Frame[CMD=PRODUCE, CorrID=101, Topic='orders', Payload=Bytes]
         S->>W: Dispatch Request Task
-        W->>T: Append to In-Memory Queue & WAL
+        W->>T: Append to In-Memory ConcurrentQueue
         T-->>W: Committed Offset: 4502
         W->>S: Response Frame[CMD=PRODUCE_ACK, CorrID=101, Offset=4502]
         S-->>C: Deliver ACK Frame
@@ -180,7 +180,7 @@ sequenceDiagram
         Note over C,T: Consume Message Flow
         C->>S: Frame[CMD=FETCH, CorrID=102, Topic='orders', Offset=4502, MaxBytes=65536]
         S->>W: Fetch Task
-        W->>T: Read from Offset 4502
+        W->>T: Read from In-Memory Offset 4502
         T-->>W: Message Batch [ID=101, Offset=4502]
         W->>S: Response Frame[CMD=FETCH_RES, CorrID=102, Messages]
         S-->>C: Deliver Messages
@@ -190,7 +190,7 @@ sequenceDiagram
 
 ---
 
-## 4. Broker Internal Multi-Threading & Storage Architecture
+## 4. Broker Internal Multi-Threading & In-Memory Storage
 
 ```mermaid
 flowchart TB
@@ -206,20 +206,13 @@ flowchart TB
         ROUTER -->|Fetch| TOPIC_MGR
         ROUTER -->|Health| HEALTH_MOD["Health Provider (/health)"]
 
-        subgraph TOPIC_PART["Topic: 'orders'"]
-            PART0["Partition 0 (Bounded ConcurrentQueue)"]
-            PART1["Partition 1 (Bounded ConcurrentQueue)"]
+        subgraph TOPIC_PART["Topic: 'orders' (Pure In-Memory)"]
+            PART0["Partition 0 (Bounded ConcurrentQueue in RAM)"]
+            PART1["Partition 1 (Bounded ConcurrentQueue in RAM)"]
         end
 
         TOPIC_MGR --> PART0
         TOPIC_MGR --> PART1
-    end
-
-    subgraph PERSISTENCE["Durable Log Layer (Disk WAL)"]
-        PART0 --> WAL0["WAL Segment 0000.log"]
-        PART0 --> IDX0["Index File 0000.idx"]
-        PART1 --> WAL1["WAL Segment 0000.log"]
-        PART1 --> IDX1["Index File 0000.idx"]
     end
 
     subgraph POOL["Asynchronous Execution"]
@@ -255,16 +248,6 @@ flowchart TB
                 P3_HTTP["HTTP Health :8083"]
             end
         end
-
-        subgraph VOLUMES["Persistent Named Volumes"]
-            V1[("vol_broker_a_data\n(/var/lib/hydra)")]
-            V2[("vol_broker_b_data\n(/var/lib/hydra)")]
-            V3[("vol_broker_c_data\n(/var/lib/hydra)")]
-        end
-
-        B1 --- V1
-        B2 --- V2
-        B3 --- V3
     end
 
     subgraph HOST_CLIENTS["External Host / Simulator Access"]
@@ -386,7 +369,7 @@ sequenceDiagram
     
     loop Healthcheck Polling
         C->>B: GET http://localhost:8082/health
-        B-->>C: 200 OK (Status: Ready, Log Recovered)
+        B-->>C: 200 OK (Status: Ready, In-Memory Queues Active)
     end
     
     C->>O: Emit Event[fault.recovery.completed, target=broker-b, duration_ms=1840]
@@ -400,60 +383,58 @@ sequenceDiagram
 
 ---
 
-## 9. Correctness Oracle Entity-Relationship Model (ERD)
+## 9. Correctness Oracle In-Memory Data Model (Pure RAM Structs — No Database)
+
+> [!NOTE]
+> No database (SQL, NoSQL, or embedded) is used. The verification engine maintains high-speed in-memory data structures (hash maps, vectors, and concurrent queues in RAM) to track and reconcile message lifecycles in real time.
 
 ```mermaid
-erDiagram
-    EXPERIMENT ||--o{ MESSAGE : generates
-    EXPERIMENT ||--o{ FAULT_ACTION : executes
-    EXPERIMENT ||--|| REPORT : produces
-
-    MESSAGE ||--o{ SEND_ATTEMPT : traces
-    MESSAGE ||--o| ACKNOWLEDGEMENT : receives
-    MESSAGE ||--o| DELIVERY : observed_as
-    MESSAGE ||--o| COMMIT : tracked_by
-
-    SEND_ATTEMPT {
-        string run_id
-        uint32 producer_id
-        uint64 sequence_number
-        timestamp attempted_at
+classDiagram
+    class InMemoryLedger {
+        +map~uint64, MessageRecord~ in_flight_messages
+        +vector~FaultRecord~ fault_timeline
+        +record_send(seq, producer_id, timestamp)
+        +record_ack(seq, broker_id, offset)
+        +record_delivery(seq, consumer_id, offset)
+        +reconcile_invariants() InvariantResult
     }
 
-    ACKNOWLEDGEMENT {
-        string run_id
-        uint64 sequence_number
-        string broker_id
-        uint64 partition_id
-        uint64 offset
-        timestamp acked_at
+    class MessageRecord {
+        +uint64 run_id
+        +uint32 producer_id
+        +uint64 sequence_number
+        +uint64 assigned_offset
+        +uint64 send_timestamp_ns
+        +uint64 ack_timestamp_ns
+        +string outcome_state
     }
 
-    DELIVERY {
-        string run_id
-        uint32 consumer_id
-        uint64 sequence_number
-        uint64 offset
-        timestamp delivered_at
+    class DeliveryRecord {
+        +uint32 consumer_id
+        +uint64 delivery_timestamp_ns
+        +uint64 consumed_offset
     }
 
-    FAULT_ACTION {
-        string fault_id
-        string target_broker
-        string action_type
-        timestamp scheduled_at
-        timestamp executed_at
-        string status
+    class FaultRecord {
+        +string fault_id
+        +string target_broker
+        +string action_type
+        +uint64 scheduled_ns
+        +uint64 executed_ns
+        +string outcome
     }
 
-    REPORT {
-        string run_id
-        string execution_status
-        string correctness_status
-        float p50_latency_ms
-        float p95_latency_ms
-        float p99_latency_ms
+    class InvariantResult {
+        +bool offsets_monotonic
+        +bool no_loss_detected
+        +bool bounded_queue_respected
+        +uint64 duplicate_count
     }
+
+    InMemoryLedger *-- MessageRecord : stores in RAM
+    MessageRecord o-- DeliveryRecord : consumer observation
+    InMemoryLedger o-- FaultRecord : fault history in RAM
+    InMemoryLedger ..> InvariantResult : computes in memory
 ```
 
 ---
@@ -466,13 +447,13 @@ flowchart TD
     
     READER --> EV_ROUTER{"Event Type"}
     EV_ROUTER -->|produce.attempted| S1["Bucket: attempted (Total Sent)"]
-    EV_ROUTER -->|produce.acknowledged| S2["Bucket: acknowledged (Confirmed Durable)"]
+    EV_ROUTER -->|produce.acknowledged| S2["Bucket: acknowledged (Confirmed Received)"]
     EV_ROUTER -->|produce.timeout| S3["Bucket: unknown_outcome (Ambiguous)"]
     EV_ROUTER -->|produce.rejected| S4["Bucket: rejected (Definite Failures)"]
     EV_ROUTER -->|consumer.delivered| S5["Bucket: delivered (Consumer Observed)"]
     EV_ROUTER -->|consumer.committed| S6["Bucket: committed (Offsets Progressed)"]
 
-    S1 --> RECON["Oracle Reconciliation Engine"]
+    S1 --> RECON["Oracle Reconciliation Engine (In-Memory)"]
     S2 --> RECON
     S3 --> RECON
     S4 --> RECON
@@ -481,7 +462,7 @@ flowchart TD
 
     subgraph ASSERTIONS["Evaluated Invariants"]
         A1["Invariant: partition_offsets_monotonic"]
-        A2["Invariant: no_acknowledged_message_loss\n(ack in delivered OR acknowledged in WAL)"]
+        A2["Invariant: no_acknowledged_message_loss\n(ack in delivered)"]
         A3["Invariant: queue_capacity_respected"]
         A4["Invariant: no_duplicate_delivery\n(Strict Exactly-Once if enabled)"]
     end
