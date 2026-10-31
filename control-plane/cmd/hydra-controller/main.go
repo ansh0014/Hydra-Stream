@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hydra-stream/control-plane/pkg/discovery"
+	"github.com/hydra-stream/control-plane/pkg/metrics"
 	"github.com/hydra-stream/control-plane/pkg/policy"
 	"github.com/hydra-stream/control-plane/pkg/routing"
 	"github.com/hydra-stream/control-plane/pkg/types"
@@ -19,38 +21,42 @@ type ControllerServer struct {
 	registry     *discovery.Registry
 	policyEngine *policy.PolicyEngine
 	router       *routing.Router
+	etcdClient   *discovery.EtcdClient
+	promClient   *metrics.PrometheusClient
 }
 
-func NewControllerServer() *ControllerServer {
+func NewControllerServer(seedDefaults bool) *ControllerServer {
 	reg := discovery.NewRegistry(30 * time.Second)
 	pe := policy.NewPolicyEngine()
 	r := routing.NewRouter(reg, pe)
 
-	// Pre-seed default 3-region topology
-	reg.Register(types.BrokerNode{
-		ID:         "broker-india",
-		Region:     "India",
-		Endpoint:   "127.0.0.1:9092",
-		HealthPort: 9092,
-		Status:     "HEALTHY",
-		RTT:        10 * time.Millisecond,
-	})
-	reg.Register(types.BrokerNode{
-		ID:         "broker-germany",
-		Region:     "Germany",
-		Endpoint:   "127.0.0.1:9093",
-		HealthPort: 9093,
-		Status:     "HEALTHY",
-		RTT:        85 * time.Millisecond,
-	})
-	reg.Register(types.BrokerNode{
-		ID:         "broker-singapore",
-		Region:     "Singapore",
-		Endpoint:   "127.0.0.1:9094",
-		HealthPort: 9094,
-		Status:     "HEALTHY",
-		RTT:        40 * time.Millisecond,
-	})
+	if seedDefaults {
+		// Fallback seed topology when running without live etcd cluster
+		reg.Register(types.BrokerNode{
+			ID:         "broker-india",
+			Region:     "India",
+			Endpoint:   "127.0.0.1:9092",
+			HealthPort: 9092,
+			Status:     "HEALTHY",
+			RTT:        10 * time.Millisecond,
+		})
+		reg.Register(types.BrokerNode{
+			ID:         "broker-germany",
+			Region:     "Germany",
+			Endpoint:   "127.0.0.1:9093",
+			HealthPort: 9093,
+			Status:     "HEALTHY",
+			RTT:        85 * time.Millisecond,
+		})
+		reg.Register(types.BrokerNode{
+			ID:         "broker-singapore",
+			Region:     "Singapore",
+			Endpoint:   "127.0.0.1:9094",
+			HealthPort: 9094,
+			Status:     "HEALTHY",
+			RTT:        40 * time.Millisecond,
+		})
+	}
 
 	return &ControllerServer{
 		registry:     reg,
@@ -149,9 +155,29 @@ func (s *ControllerServer) handleLatencyInject(w http.ResponseWriter, r *http.Re
 
 func main() {
 	port := flag.Int("port", 8080, "Port for Hydra Controller HTTP API")
+	etcdEndpoint := flag.String("etcd", "http://127.0.0.1:2379", "etcd v3 endpoint URL")
+	promEndpoint := flag.String("prometheus", "http://127.0.0.1:9090", "Prometheus API endpoint URL")
+	enableEtcd := flag.Bool("enable-etcd", true, "Enable dynamic discovery via etcd watcher")
+	enableProm := flag.Bool("enable-prom", true, "Enable live latency scraping via Prometheus")
+	seedFallback := flag.Bool("seed-fallback", true, "Pre-seed fallback topology if external cluster is offline")
 	flag.Parse()
 
-	server := NewControllerServer()
+	server := NewControllerServer(*seedFallback)
+	ctx := context.Background()
+
+	// 1. Open Source Integration: etcd dynamic discovery watcher
+	if *enableEtcd {
+		log.Printf("[Hydra Controller] Connecting to etcd v3 at %s...\n", *etcdEndpoint)
+		server.etcdClient = discovery.NewEtcdClient([]string{*etcdEndpoint}, 3*time.Second)
+		server.etcdClient.StartWatcher(ctx, server.registry, 2*time.Second)
+	}
+
+	// 2. Open Source Integration: Prometheus live link latency scraper
+	if *enableProm {
+		log.Printf("[Hydra Controller] Connecting to Prometheus at %s...\n", *promEndpoint)
+		server.promClient = metrics.NewPrometheusClient(*promEndpoint, 3*time.Second)
+		server.promClient.StartMetricsScraper(ctx, server.registry, 2*time.Second)
+	}
 
 	http.HandleFunc("/health", server.handleHealth)
 	http.HandleFunc("/cluster/topology", server.handleTopology)
