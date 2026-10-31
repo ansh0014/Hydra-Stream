@@ -1,0 +1,41 @@
+/* Custom Styles & Visual Glows for Hydra Dashboard */
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap');
+
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+code, kbd, samp, pre, .font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Custom scrollbar for console */
+#console-log::-webkit-scrollbar {
+  width: 6px;
+}
+
+#console-log::-webkit-scrollbar-track {
+  background: #020617;
+}
+
+#console-log::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 3px;
+}
+
+#console-log::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+/* Node pulse when degraded */
+.node-degraded {
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 20px rgba(245, 158, 11, 0.25);
+}
+
+/* Node pulse when offline */
+.node-offline {
+  border-color: #f43f5e !important;
+  box-shadow: 0 0 20px rgba(244, 63, 94, 0.25);
+  opacity: 0.65;
+}

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hydra Stream — Multi-Region Sovereign Streaming Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="styles.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: '#06b6d4',
+            brandDark: '#0e7490',
+            panel: '#0f172a',
+            panelBorder: '#1e293b'
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="h-9 w-9 rounded-lg bg-cyan-500/20 border border-cyan-500 flex items-center justify-center font-bold text-cyan-400 text-lg shadow-[0_0_15px_rgba(6,182,212,0.5)]">
+        H
+      </div>
+      <div>
+        <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+          HYDRA STREAM
+          <span class="text-xs font-mono uppercase bg-cyan-950 text-cyan-400 border border-cyan-800 px-2 py-0.5 rounded">v1.2-GeoResilient</span>
+        </h1>
+        <p class="text-xs text-slate-400 font-mono">UN SDG 9.1 Infrastructure • EU GDPR Sovereign Boundary Engine</p>
+      </div>
+    </div>
+
+    <div class="flex items-center space-x-4">
+      <div class="flex items-center space-x-2 bg-emerald-950/50 border border-emerald-800 px-3 py-1 rounded-full">
+        <span class="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span class="text-xs font-mono text-emerald-300 font-medium" id="cluster-status">CLUSTER HEALTHY</span>
+      </div>
+      <button id="btn-refresh" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded border border-slate-700 font-mono transition">
+        Sync Controller
+      </button>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8 space-y-8">
+
+    <!-- KPI Summary Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 relative overflow-hidden">
+        <div class="text-xs font-mono text-slate-400 uppercase tracking-wider">In-Memory P50 Latency</div>
+        <div class="text-3xl font-extrabold text-cyan-400 mt-2 font-mono flex items-baseline gap-2">
+          0.20 <span class="text-sm font-normal text-slate-400">µs (200 ns)</span>
+        </div>
+        <div class="text-xs text-emerald-400 mt-2 flex items-center gap-1 font-mono">
+          <span>⚡</span> RingBuffer Core Engine
+        </div>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 relative overflow-hidden">
+        <div class="text-xs font-mono text-slate-400 uppercase tracking-wider">Peak Pipe Throughput</div>
+        <div class="text-3xl font-extrabold text-white mt-2 font-mono flex items-baseline gap-2" id="stat-throughput">
+          309,597 <span class="text-sm font-normal text-slate-400">msg/sec</span>
+        </div>
+        <div class="text-xs text-cyan-400 mt-2 flex items-center gap-1 font-mono">
+          <span>▲</span> ~79.2 MB/sec Retained Log
+        </div>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 relative overflow-hidden">
+        <div class="text-xs font-mono text-slate-400 uppercase tracking-wider">Data Residency Compliance</div>
+        <div class="text-3xl font-extrabold text-emerald-400 mt-2 font-mono flex items-baseline gap-2">
+          100.0% <span class="text-sm font-normal text-slate-400">0 Leaks</span>
+        </div>
+        <div class="text-xs text-emerald-400 mt-2 flex items-center gap-1 font-mono">
+          <span>🛡️</span> EU GDPR Article 44 Enforced
+        </div>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 relative overflow-hidden">
+        <div class="text-xs font-mono text-slate-400 uppercase tracking-wider">Slow Link Bypass SLA</div>
+        <div class="text-3xl font-extrabold text-amber-400 mt-2 font-mono flex items-baseline gap-2">
+          &lt; 250 <span class="text-sm font-normal text-slate-400">ms Failover</span>
+        </div>
+        <div class="text-xs text-slate-400 mt-2 flex items-center gap-1 font-mono">
+          <span>🔄</span> Zero Producer Blocking
+        </div>
+      </div>
+    </div>
+
+    <!-- 3-Region Live Topology Grid -->
+    <div>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <span>🌐</span> Multi-Region Autonomous Broker Cluster
+        </h2>
+        <span class="text-xs font-mono text-slate-400">Dynamic discovery via etcd v3 & Prometheus</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        <!-- Region: India -->
+        <div id="node-india" class="bg-slate-900 border border-slate-800 rounded-xl p-5 transition-all duration-300 hover:border-cyan-500/50 relative">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="text-xs font-mono text-cyan-400 font-semibold tracking-wider flex items-center gap-1.5">
+                <span>🇮🇳</span> REGION: INDIA
+              </div>
+              <h3 class="text-lg font-bold text-white mt-1">broker-india-1</h3>
+              <p class="text-xs text-slate-400 font-mono">TCP: 9092 • Health: 8081</p>
+            </div>
+            <span id="badge-india" class="text-xs px-2.5 py-0.5 rounded-full font-mono font-medium bg-emerald-950 text-emerald-300 border border-emerald-800">
+              HEALTHY
+            </span>
+          </div>
+
+          <div class="mt-4 pt-4 border-t border-slate-800/80 space-y-2 text-xs font-mono">
+            <div class="flex justify-between text-slate-400">
+              <span>Link Probe RTT:</span>
+              <span id="rtt-india" class="text-slate-200 font-bold">10 ms</span>
+            </div>
+            <div class="flex justify-between text-slate-400">
+              <span>Storage Engine:</span>
+              <span class="text-slate-200">Embedded RocksDB (Local SSD)</span>
+            </div>
+            <div class="flex justify-between text-slate-400">
+              <span>Bound Topics:</span>
+              <span class="text-cyan-300">upi-transactions, orders-india</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Region: Germany -->
+        <div id="node-germany" class="bg-slate-900 border border-slate-800 rounded-xl p-5 transition-all duration-300 hover:border-cyan-500/50 relative">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="text-xs font-mono text-cyan-400 font-semibold tracking-wider flex items-center gap-1.5">
+                <span>🇩🇪</span> REGION: GERMANY
+              </div>
+              <h3 class="text-lg font-bold text-white mt-1">broker-germany-1</h3>
+              <p class="text-xs text-slate-400 font-mono">TCP: 9093 • Health: 8082</p>
+            </div>
+            <span id="badge-germany" class="text-xs px-2.5 py-0.5 rounded-full font-mono font-medium bg-emerald-950 text-emerald-300 border border-emerald-800">
+              HEALTHY
+            </span>
+          </div>
+
+          <div class="mt-4 pt-4 border-t border-slate-800/80 space-y-2 text-xs font-mono">
+            <div class="flex justify-between text-slate-400">
+              <span>Link Probe RTT:</span>
+              <span id="rtt-germany" class="text-slate-200 font-bold">85 ms</span>
+            </div>
+            <div class="flex justify-between text-slate-400">
+              <span>Legal Boundary:</span>
+              <span class="text-purple-400 font-semibold">EU GDPR Sovereign Lock</span>
+            </div>
+            <div class="flex justify-between text-slate-400">
+              <span>Bound Topics:</span>
+              <span class="text-purple-300">gdpr-user-audit, eu-payments</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Region: Singapore -->
+        <div id="node-singapore" class="bg-slate-900 border border-slate-800 rounded-xl p-5 transition-all duration-300 hover:border-cyan-500/50 relative">
+          <div class="flex items-start justify-between">
+            <div>
+              <div class="text-xs font-mono text-cyan-400 font-semibold tracking-wider flex items-center gap-1.5">
+                <span>🇸🇬</span> REGION: SINGAPORE
+              </div>
+              <h3 class="text-lg font-bold text-white mt-1">broker-singapore-1</h3>
+              <p class="text-xs text-slate-400 font-mono">TCP: 9094 • Health: 8083</p>
+            </div>
+            <span id="badge-singapore" class="text-xs px-2.5 py-0.5 rounded-full font-mono font-medium bg-emerald-950 text-emerald-300 border border-emerald-800">
+              HEALTHY
+            </span>
+          </div>
+
+          <div class="mt-4 pt-4 border-t border-slate-800/80 space-y-2 text-xs font-mono">
+            <div class="flex justify-between text-slate-400">
+              <span>Link Probe RTT:</span>
+              <span id="rtt-singapore" class="text-slate-200 font-bold">40 ms</span>
+            </div>
+            <div class="flex justify-between text-slate-400">
+              <span>Role:</span>
+              <span class="text-slate-200">APAC Trading & Global Fallback</span>
+            </div>
+            <div class="flex justify-between text-slate-400">
+              <span>Bound Topics:</span>
+              <span class="text-cyan-300">apac-fx, global-telemetry</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Live Telemetry & Latency Histogram Charts -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-bold text-white font-mono uppercase tracking-wider flex items-center gap-2">
+            <span>📈</span> Real-Time Ingress Throughput (msg/sec)
+          </h3>
+          <span class="text-xs font-mono text-cyan-400" id="live-rate-label">Live: 300k msg/s</span>
+        </div>
+        <div class="h-64">
+          <canvas id="throughputChart"></canvas>
+        </div>
+      </div>
+
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-bold text-white font-mono uppercase tracking-wider flex items-center gap-2">
+            <span>⏱️</span> Latency Percentile Distribution (µs)
+          </h3>
+          <span class="text-xs font-mono text-slate-400">Benchmark Pipeline</span>
+        </div>
+        <div class="h-64">
+          <canvas id="latencyChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Chaos Testing & Simulation Controls -->
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <span>⚡</span> Automated Chaos & Stress Testing Controls
+          </h3>
+          <p class="text-xs text-slate-400 font-mono mt-0.5">Test real-time routing adaptation without manual container surgery</p>
+        </div>
+        <span class="text-xs bg-slate-800 text-slate-300 border border-slate-700 px-3 py-1 rounded font-mono">
+          Target: SDG 9.1 Infrastructure Resilience
+        </span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <button id="btn-burst" class="bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs font-medium py-3 px-4 rounded-lg shadow-sm transition flex flex-col items-center justify-center gap-1">
+          <span class="font-bold text-sm">▶ Emit 100,000 Burst</span>
+          <span class="text-[11px] opacity-80">High-Throughput Stress Test</span>
+        </button>
+
+        <button id="btn-slow-link" class="bg-amber-600 hover:bg-amber-500 text-white font-mono text-xs font-medium py-3 px-4 rounded-lg shadow-sm transition flex flex-col items-center justify-center gap-1">
+          <span class="font-bold text-sm">⚠️ Inject Undersea Cut</span>
+          <span class="text-[11px] opacity-80">tc netem +260ms on India</span>
+        </button>
+
+        <button id="btn-blackout" class="bg-rose-700 hover:bg-rose-600 text-white font-mono text-xs font-medium py-3 px-4 rounded-lg shadow-sm transition flex flex-col items-center justify-center gap-1">
+          <span class="font-bold text-sm">🛑 Frankfurt Outage</span>
+          <span class="text-[11px] opacity-80">Test EU GDPR Quarantine</span>
+        </button>
+
+        <button id="btn-restore" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 font-mono text-xs font-medium py-3 px-4 rounded-lg shadow-sm transition flex flex-col items-center justify-center gap-1">
+          <span class="font-bold text-sm">🔄 Restore Normal State</span>
+          <span class="text-[11px] opacity-80">Flush Netem & Recover</span>
+        </button>
+      </div>
+
+      <!-- Live Event Console Log -->
+      <div class="mt-6">
+        <div class="text-xs font-mono text-slate-400 mb-2 flex items-center justify-between">
+          <span>Routing Decision Stream (events.jsonl trace)</span>
+          <span class="text-cyan-400">Stream Buffer: Active</span>
+        </div>
+        <div id="console-log" class="bg-slate-950 border border-slate-800 rounded-lg p-3 font-mono text-xs text-slate-300 h-36 overflow-y-auto space-y-1">
+          <div class="text-slate-500">[System] Hydra Control Plane Coordinator initialized.</div>
+          <div class="text-emerald-400">[Discovery] etcd v3 watcher registered 3 active brokers: India (9092), Germany (9093), Singapore (9094).</div>
+          <div class="text-cyan-400">[Telemetry] Prometheus latency scraper polling interval: 2s. All inter-region links operational.</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <footer class="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-500 font-mono">
+    Hydra Stream © 2026 • High-Reliability Geo-Resilient Streaming Broker • Apache-2.0
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
