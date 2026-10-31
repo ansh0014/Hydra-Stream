@@ -1,0 +1,91 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  font-family: 'Poppins', 'Inter', sans-serif;
+}
+
+body {
+  background-color: #000000;
+  color: #ffffff;
+  overflow-x: hidden;
+}
+
+code, kbd, samp, pre, .font-mono {
+  font-family: 'JetBrains Mono', monospace !important;
+}
+
+/* Glassmorphism based on design.tsx */
+.glass-panel {
+  background: rgba(18, 18, 18, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-panel-hover:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(26, 26, 26, 0.75);
+}
+
+/* Tactile Gradient Button from design.tsx */
+.btn-gradient {
+  background: linear-gradient(to bottom, #ffffff, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.65));
+  color: #000000;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.15);
+}
+.btn-gradient:hover {
+  transform: scale(1.03);
+  box-shadow: 0 0 25px rgba(255, 255, 255, 0.25);
+}
+.btn-gradient:active {
+  transform: scale(0.97);
+}
+
+/* Subtle node status animations */
+.node-degraded {
+  border-color: rgba(245, 158, 11, 0.6) !important;
+  box-shadow: 0 0 25px rgba(245, 158, 11, 0.2) !important;
+}
+
+.node-offline {
+  border-color: rgba(239, 68, 68, 0.6) !important;
+  box-shadow: 0 0 25px rgba(239, 68, 68, 0.2) !important;
+  opacity: 0.7;
+}
+
+/* Minimalist scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+::-webkit-scrollbar-thumb {
+  background: #262626;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #404040;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
