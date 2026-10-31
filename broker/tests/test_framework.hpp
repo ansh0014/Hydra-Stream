@@ -4,7 +4,7 @@
 #include <sstream>
 #include <string>
 
-namespace mini_kafka_test {
+namespace hydra_test {
 
 struct TestContext {
     int failures{0};
@@ -29,7 +29,7 @@ inline void expect_equal(TestContext& context, const Left& left, const Right& ri
 
 inline int finish(const TestContext& context) {
     if (context.failures == 0) {
-        std::cout << "PASS\n";
+        std::cout << "ALL TESTS PASSED\n";
         return 0;
     }
 
@@ -37,4 +37,4 @@ inline int finish(const TestContext& context) {
     return 1;
 }
 
-}  // namespace mini_kafka_test
+} // namespace hydra_test

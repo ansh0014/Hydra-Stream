@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(mini_kafka VERSION 1.0.0 LANGUAGES CXX)
+project(hydra_stream VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,65 +8,56 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(Threads REQUIRED)
 
-add_library(mini_kafka
-    src/broker.cpp
-    src/consumer.cpp
-    src/health_monitor.cpp
-    src/logger.cpp
-    src/main.cpp
-    src/producer.cpp
+add_library(hydra_core STATIC
+    src/partition.cpp
     src/topic.cpp
     src/thread_pool.cpp
+    src/logger.cpp
+    src/broker.cpp
+    src/server.cpp
 )
 
-target_include_directories(mini_kafka
+target_include_directories(hydra_core
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(mini_kafka
+target_link_libraries(hydra_core
     PUBLIC
         Threads::Threads
 )
 
-add_executable(mini_kafka_app
+if(WIN32)
+    target_link_libraries(hydra_core PUBLIC ws2_32)
+endif()
+
+add_executable(hydra_broker
     src/main.cpp
 )
 
-target_link_libraries(mini_kafka_app
+target_link_libraries(hydra_broker
     PRIVATE
-        mini_kafka
+        hydra_core
 )
 
 enable_testing()
 
-add_executable(test_concurrent_queue
-    tests/test_concurrent_queue.cpp
-)
-
-target_link_libraries(test_concurrent_queue
-    PRIVATE
-        mini_kafka
-)
-
+add_executable(test_concurrent_queue tests/test_concurrent_queue.cpp)
+target_link_libraries(test_concurrent_queue PRIVATE hydra_core)
 add_test(NAME concurrent_queue COMMAND test_concurrent_queue)
 
-add_executable(test_pipeline
-    tests/test_pipeline.cpp
-)
+add_executable(test_partition tests/test_partition.cpp)
+target_link_libraries(test_partition PRIVATE hydra_core)
+add_test(NAME partition COMMAND test_partition)
 
-target_link_libraries(test_pipeline
-    PRIVATE
-        mini_kafka
-)
+add_executable(test_topic tests/test_topic.cpp)
+target_link_libraries(test_topic PRIVATE hydra_core)
+add_test(NAME topic COMMAND test_topic)
 
+add_executable(test_pipeline tests/test_pipeline.cpp)
+target_link_libraries(test_pipeline PRIVATE hydra_core)
 add_test(NAME pipeline COMMAND test_pipeline)
 
-add_executable(mini_kafka_benchmark
-    benchmark/benchmark.cpp
-)
-
-target_link_libraries(mini_kafka_benchmark
-    PRIVATE
-        mini_kafka
-)
+add_executable(test_server tests/test_server.cpp)
+target_link_libraries(test_server PRIVATE hydra_core)
+add_test(NAME server COMMAND test_server)

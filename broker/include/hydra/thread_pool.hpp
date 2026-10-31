@@ -1,6 +1,6 @@
 #pragma once
 
-#include "mini_kafka/concurrent_queue.hpp"
+#include "hydra/concurrent_queue.hpp"
 
 #include <functional>
 #include <future>
@@ -9,7 +9,7 @@
 #include <type_traits>
 #include <vector>
 
-namespace mini_kafka {
+namespace hydra {
 
 class ThreadPool {
 public:
@@ -36,6 +36,7 @@ public:
     }
 
     void shutdown();
+    std::size_t worker_count() const noexcept { return workers_.size(); }
 
 private:
     void worker_thread();
@@ -44,4 +45,4 @@ private:
     ConcurrentQueue<std::function<void()>> work_queue_;
 };
 
-}
+} // namespace hydra

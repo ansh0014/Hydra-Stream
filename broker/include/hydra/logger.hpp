@@ -1,17 +1,16 @@
 #pragma once
 
-#include "mini_kafka/concurrent_queue.hpp"
+#include "hydra/concurrent_queue.hpp"
 
 #include <atomic>
 #include <chrono>
-#include <cstddef>
 #include <iostream>
 #include <mutex>
 #include <ostream>
 #include <string>
 #include <thread>
 
-namespace mini_kafka {
+namespace hydra {
 
 class Logger {
 public:
@@ -19,16 +18,16 @@ public:
         Debug,
         Info,
         Warning,
-        Error,
+        Error
     };
 
     struct Record {
-        Level level{Level::Info};
+        Level level;
         std::string message;
-        std::chrono::system_clock::time_point timestamp{std::chrono::system_clock::now()};
+        std::chrono::system_clock::time_point timestamp;
     };
 
-    explicit Logger(std::ostream& output = std::clog);
+    explicit Logger(std::ostream& output = std::cout);
     ~Logger();
 
     Logger(const Logger&) = delete;
@@ -47,11 +46,11 @@ private:
     std::string format(const Record& record) const;
     static std::string level_to_string(Level level);
 
-    std::ostream* output_{nullptr};
-    mutable std::mutex output_mutex_;
+    std::ostream* output_;
+    std::mutex output_mutex_;
     ConcurrentQueue<Record> records_;
+    std::atomic<bool> running_{true};
     std::thread worker_;
-    std::atomic<bool> running_{false};
 };
 
-}  // namespace mini_kafka
+} // namespace hydra

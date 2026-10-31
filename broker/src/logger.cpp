@@ -1,10 +1,11 @@
-#include "mini_kafka/logger.hpp"
+#include "hydra/logger.hpp"
 
 #include <chrono>
 #include <iomanip>
+#include <iostream>
 #include <sstream>
 
-namespace mini_kafka {
+namespace hydra {
 
 Logger::Logger(std::ostream& output)
     : output_(&output), running_(true), worker_([this] { run(); }) {}
@@ -38,20 +39,18 @@ void Logger::error(std::string message) {
 }
 
 void Logger::stop() {
-    running_.store(false, std::memory_order_relaxed);
-    records_.close();
-
-    if (worker_.joinable()) {
-        worker_.join();
+    if (running_.exchange(false, std::memory_order_relaxed)) {
+        records_.close();
+        if (worker_.joinable()) {
+            worker_.join();
+        }
     }
 }
 
 void Logger::run() {
     Record record;
-
     while (records_.wait_and_pop(record)) {
         const std::string line = format(record);
-
         {
             std::lock_guard<std::mutex> lock(output_mutex_);
             (*output_) << line << '\n';
@@ -71,17 +70,12 @@ std::string Logger::format(const Record& record) const {
 
 std::string Logger::level_to_string(Level level) {
     switch (level) {
-        case Level::Debug:
-            return "DEBUG";
-        case Level::Info:
-            return "INFO";
-        case Level::Warning:
-            return "WARN";
-        case Level::Error:
-            return "ERROR";
+        case Level::Debug:   return "DEBUG";
+        case Level::Info:    return "INFO";
+        case Level::Warning: return "WARN";
+        case Level::Error:   return "ERROR";
     }
-
     return "INFO";
 }
 
-}
+} // namespace hydra

@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hydra-broker-germany
+  labels:
+    app: hydra-broker
+    region: Germany
+    jurisdiction: EU_GDPR
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hydra-broker-germany
+  template:
+    metadata:
+      labels:
+        app: hydra-broker-germany
+        region: Germany
+        jurisdiction: EU_GDPR
+    spec:
+      containers:
+        - name: broker
+          image: hydra-broker:dev
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: BROKER_ID
+              value: "broker-germany-1"
+            - name: REGION
+              value: "Germany"
+            - name: PORT
+              value: "9093"
+            - name: HEALTH_PORT
+              value: "8082"
+          ports:
+            - containerPort: 9093
+              name: tcp-ingress
+            - containerPort: 8082
+              name: health
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: broker-germany
+spec:
+  ports:
+    - port: 9093
+      targetPort: 9093
+      name: tcp-ingress
+    - port: 8082
+      targetPort: 8082
+      name: health
+  selector:
+    app: hydra-broker-germany

@@ -3,19 +3,19 @@
 #include <chrono>
 #include <condition_variable>
 #include <cstddef>
+#include <limits>
 #include <mutex>
 #include <queue>
 #include <stdexcept>
 #include <utility>
-#include <limits>
 
-namespace mini_kafka {
+namespace hydra {
 
 template <typename T>
 class ConcurrentQueue {
 public:
     explicit ConcurrentQueue(std::size_t capacity = std::numeric_limits<std::size_t>::max())
-        : capacity_(capacity) {}
+        : capacity_(capacity), closed_(false) {}
 
     ConcurrentQueue(const ConcurrentQueue&) = delete;
     ConcurrentQueue& operator=(const ConcurrentQueue&) = delete;
@@ -101,9 +101,9 @@ public:
         condition_not_full_.notify_all();
     }
 
-    bool closed() const {
+    bool empty() const {
         std::lock_guard<std::mutex> lock(mutex_);
-        return closed_;
+        return queue_.empty();
     }
 
     std::size_t size() const {
@@ -115,13 +115,18 @@ public:
         return capacity_;
     }
 
+    bool is_closed() const {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return closed_;
+    }
+
 private:
+    std::size_t capacity_;
+    bool closed_;
+    std::queue<T> queue_;
     mutable std::mutex mutex_;
     std::condition_variable condition_not_empty_;
     std::condition_variable condition_not_full_;
-    std::queue<T> queue_;
-    const std::size_t capacity_;
-    bool closed_{false};
 };
 
-}
+} // namespace hydra

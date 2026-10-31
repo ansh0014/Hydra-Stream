@@ -1,0 +1,88 @@
+version: '3.8'
+
+networks:
+  hydra-mesh:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+
+services:
+  # Dynamic Service Registry
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.12
+    container_name: hydra-etcd
+    command:
+      - /usr/local/bin/etcd
+      - --advertise-client-urls=http://etcd:2379
+      - --listen-client-urls=http://0.0.0.0:2379
+    ports:
+      - "2379:2379"
+    networks:
+      - hydra-mesh
+
+  # Inter-region Link Latency & Metrics Scraping
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: hydra-prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - hydra-mesh
+
+  # Regional Broker Node 1: India
+  broker-india:
+    build:
+      context: ../../broker
+      dockerfile: Dockerfile
+    container_name: hydra-broker-india
+    environment:
+      - BROKER_ID=broker-india-1
+      - REGION=India
+      - PORT=9092
+      - HEALTH_PORT=8081
+    ports:
+      - "9092:9092"
+      - "8081:8081"
+    depends_on:
+      - etcd
+    networks:
+      - hydra-mesh
+
+  # Regional Broker Node 2: Germany (EU Legal Data Jurisdiction)
+  broker-germany:
+    build:
+      context: ../../broker
+      dockerfile: Dockerfile
+    container_name: hydra-broker-germany
+    environment:
+      - BROKER_ID=broker-germany-1
+      - REGION=Germany
+      - PORT=9093
+      - HEALTH_PORT=8082
+    ports:
+      - "9093:9093"
+      - "8082:8082"
+    depends_on:
+      - etcd
+    networks:
+      - hydra-mesh
+
+  # Regional Broker Node 3: Singapore
+  broker-singapore:
+    build:
+      context: ../../broker
+      dockerfile: Dockerfile
+    container_name: hydra-broker-singapore
+    environment:
+      - BROKER_ID=broker-singapore-1
+      - REGION=Singapore
+      - PORT=9094
+      - HEALTH_PORT=8083
+    ports:
+      - "9094:9094"
+      - "8083:8083"
+    depends_on:
+      - etcd
+    networks:
+      - hydra-mesh

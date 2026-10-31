@@ -1,8 +1,11 @@
-#include "mini_kafka/thread_pool.hpp"
+#include "hydra/thread_pool.hpp"
 
-namespace mini_kafka {
+namespace hydra {
 
 ThreadPool::ThreadPool(std::size_t threads) {
+    if (threads == 0) {
+        threads = 4;
+    }
     workers_.reserve(threads);
     for (std::size_t i = 0; i < threads; ++i) {
         workers_.emplace_back([this] { worker_thread(); });
@@ -31,8 +34,9 @@ void ThreadPool::worker_thread() {
                 task();
             }
         } catch (...) {
+            // Suppress uncaught exceptions from background tasks to keep pool alive
         }
     }
 }
 
-}
+} // namespace hydra

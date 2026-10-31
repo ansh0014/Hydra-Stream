@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hydra-broker-singapore
+  labels:
+    app: hydra-broker
+    region: Singapore
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hydra-broker-singapore
+  template:
+    metadata:
+      labels:
+        app: hydra-broker-singapore
+        region: Singapore
+    spec:
+      containers:
+        - name: broker
+          image: hydra-broker:dev
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: BROKER_ID
+              value: "broker-singapore-1"
+            - name: REGION
+              value: "Singapore"
+            - name: PORT
+              value: "9094"
+            - name: HEALTH_PORT
+              value: "8083"
+          ports:
+            - containerPort: 9094
+              name: tcp-ingress
+            - containerPort: 8083
+              name: health
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: broker-singapore
+spec:
+  ports:
+    - port: 9094
+      targetPort: 9094
+      name: tcp-ingress
+    - port: 8083
+      targetPort: 8083
+      name: health
+  selector:
+    app: hydra-broker-singapore

@@ -1,52 +1,34 @@
-#include "mini_kafka/consumer.hpp"
-#include "mini_kafka/logger.hpp"
-#include "mini_kafka/metrics.hpp"
-#include "mini_kafka/producer.hpp"
-#include "mini_kafka/topic.hpp"
+#include "hydra/broker.hpp"
 #include "test_framework.hpp"
 
 #include <atomic>
 #include <chrono>
-#include <cstdint>
-#include <memory>
 #include <sstream>
 
-using namespace std::chrono_literals;
-
 int main() {
-    mini_kafka_test::TestContext context;
+    hydra_test::TestContext context;
 
-    std::ostringstream sink;
-    mini_kafka::Logger logger(sink);
-    mini_kafka::Metrics metrics;
-    auto topic = std::make_shared<mini_kafka::Topic>("orders");
+    std::ostringstream log_sink;
+    hydra::Broker broker("broker-test-1", "India", 4, log_sink);
 
-    std::atomic<std::size_t> processed{0};
+    broker.create_topic("payments", 4, "ANY");
 
-    mini_kafka::Consumer consumer(
-        "consumer-1",
-        topic,
-        metrics,
-        logger,
-        [&processed](const mini_kafka::Message&) {
-            processed.fetch_add(1, std::memory_order_relaxed);
-        });
+    constexpr size_t total_messages = 50;
+    for (size_t i = 0; i < total_messages; ++i) {
+        broker.produce("payments", "user_" + std::to_string(i % 5), "payment_payload_" + std::to_string(i));
+    }
 
-    mini_kafka::Producer producer("producer-1", topic, metrics, logger);
+    auto snapshot = broker.metrics();
+    hydra_test::expect_equal(context, snapshot.produced, static_cast<uint64_t>(total_messages), "All messages recorded as produced");
 
-    consumer.start();
-    producer.start(25, 0ms);
+    // Fetch messages across partitions
+    size_t fetched_total = 0;
+    for (uint32_t p = 0; p < 4; ++p) {
+        auto msgs = broker.fetch("payments", p, 0, 100);
+        fetched_total += msgs.size();
+    }
 
-    producer.join();
-    topic->close();
-    consumer.join();
-    logger.stop();
+    hydra_test::expect_equal(context, fetched_total, total_messages, "All messages fetched successfully across partitions");
 
-    const mini_kafka::MetricsSnapshot snapshot = metrics.snapshot();
-    mini_kafka_test::expect_equal(context, snapshot.produced, static_cast<std::uint64_t>(25), "produced count");
-    mini_kafka_test::expect_equal(context, snapshot.consumed, static_cast<std::uint64_t>(25), "consumed count");
-    mini_kafka_test::expect_equal(context, processed.load(std::memory_order_relaxed), static_cast<std::size_t>(25), "handler count");
-    mini_kafka_test::expect_equal(context, snapshot.active_consumers, static_cast<std::size_t>(0), "consumer shutdown");
-
-    return mini_kafka_test::finish(context);
+    return hydra_test::finish(context);
 }

@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hydra-broker-india
+  labels:
+    app: hydra-broker
+    region: India
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hydra-broker-india
+  template:
+    metadata:
+      labels:
+        app: hydra-broker-india
+        region: India
+    spec:
+      containers:
+        - name: broker
+          image: hydra-broker:dev
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: BROKER_ID
+              value: "broker-india-1"
+            - name: REGION
+              value: "India"
+            - name: PORT
+              value: "9092"
+            - name: HEALTH_PORT
+              value: "8081"
+          ports:
+            - containerPort: 9092
+              name: tcp-ingress
+            - containerPort: 8081
+              name: health
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: broker-india
+spec:
+  ports:
+    - port: 9092
+      targetPort: 9092
+      name: tcp-ingress
+    - port: 8081
+      targetPort: 8081
+      name: health
+  selector:
+    app: hydra-broker-india
