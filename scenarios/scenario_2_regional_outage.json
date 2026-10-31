@@ -1,0 +1,20 @@
+{
+  "scenario_id": "SCENARIO-02",
+  "name": "Catastrophic Regional Blackout & Legal Residency Boundary",
+  "target_sdg": "SDG 9.1 & EU GDPR Article 44 Compliance",
+  "description": "Simulates complete grid failure in Frankfurt (Germany region). Broker broker-germany transitions to OFFLINE. Ensures European sensitive audit streams are safely quarantined rather than leaking illegally to India or Singapore.",
+  "injections": [
+    {
+      "broker_id": "broker-germany",
+      "rtt_ms": 0,
+      "packet_loss": 1.0,
+      "status": "OFFLINE"
+    }
+  ],
+  "expected_behavior": {
+    "gdpr_residency_leakage": 0,
+    "gdpr_route_rejected": true,
+    "telemetry_route_resilient": true,
+    "recovery_auto_reconnect": true
+  }
+}

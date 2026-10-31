@@ -1,0 +1,17 @@
+# Binaries and build artifacts
+build/
+bin/
+*.exe
+*.o
+*.obj
+*.dll
+*.so
+*.dylib
+*.log
+events.jsonl
+
+# IDE and temporary files
+.vscode/
+.idea/
+*.swp
+*~
