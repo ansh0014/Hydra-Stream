@@ -1,11 +1,12 @@
 #pragma once
 
 #include "hydra/message.hpp"
+#include "hydra/ring_buffer.hpp"
 
+#include <chrono>
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
-#include <deque>
 #include <mutex>
 #include <vector>
 
@@ -13,7 +14,7 @@ namespace hydra {
 
 class Partition {
 public:
-    explicit Partition(uint32_t partition_id, size_t max_capacity = 1000000);
+    explicit Partition(uint32_t partition_id, size_t max_capacity = 65536);
     ~Partition() = default;
 
     Partition(const Partition&) = delete;
@@ -21,7 +22,7 @@ public:
 
     uint32_t id() const noexcept { return partition_id_; }
 
-    // Appends a message, assigns monotonic offset, notifies waiting consumers
+    // Appends a message to the pre-allocated ring buffer and returns monotonic offset
     uint64_t append(Message msg);
 
     // Reads up to max_count messages starting from start_offset without popping/deleting
@@ -36,13 +37,12 @@ public:
 
 private:
     uint32_t partition_id_;
-    size_t max_capacity_;
     uint64_t next_offset_{0};
     bool closed_{false};
 
-    std::deque<Message> log_;
-    mutable std::mutex mutex_;
+    mutable std::mutex cv_mutex_;
     std::condition_variable cv_new_message_;
+    RingBuffer<Message> ring_buffer_;
 };
 
 } // namespace hydra

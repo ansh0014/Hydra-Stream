@@ -1,135 +1,197 @@
-#include "mini_kafka/broker.hpp"
-#include "mini_kafka/concurrent_queue.hpp"
+#include "hydra/broker.hpp"
+#include "hydra/ring_buffer.hpp"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <iomanip>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
 
-struct NullBuffer : std::streambuf {
-    int overflow(int c) override { return c; }
+struct LatencyStats {
+    double p50_us{0.0};
+    double p95_us{0.0};
+    double p99_us{0.0};
+    double min_us{0.0};
+    double max_us{0.0};
+    double avg_us{0.0};
+    double throughput_msg_sec{0.0};
+    double data_rate_mb_sec{0.0};
 };
 
-struct NullStream : std::ostream {
-    NullStream() : std::ostream(&buf) {}
-private:
-    NullBuffer buf;
-};
+LatencyStats compute_stats(std::vector<uint64_t>& latencies_ns, double total_seconds, size_t total_bytes) {
+    LatencyStats stats;
+    if (latencies_ns.empty()) return stats;
 
-void benchmark_raw_queue(int num_producers, int num_consumers, int num_messages, std::size_t capacity) {
-    mini_kafka::ConcurrentQueue<std::string> queue(capacity);
-    std::vector<std::thread> producers;
-    std::vector<std::thread> consumers;
+    std::sort(latencies_ns.begin(), latencies_ns.end());
 
-    std::string payload(100, 'x');
+    size_t count = latencies_ns.size();
+    stats.p50_us = latencies_ns[count * 50 / 100] / 1000.0;
+    stats.p95_us = latencies_ns[count * 95 / 100] / 1000.0;
+    stats.p99_us = latencies_ns[count * 99 / 100] / 1000.0;
+    stats.min_us = latencies_ns.front() / 1000.0;
+    stats.max_us = latencies_ns.back() / 1000.0;
 
-    auto start_time = std::chrono::high_resolution_clock::now();
+    uint64_t sum = 0;
+    for (uint64_t lat : latencies_ns) {
+        sum += lat;
+    }
+    stats.avg_us = (static_cast<double>(sum) / count) / 1000.0;
 
-    std::atomic<std::size_t> consumed_count{0};
-    for (int i = 0; i < num_consumers; ++i) {
-        consumers.emplace_back([&queue, &consumed_count] {
-            std::string val;
-            while (queue.wait_and_pop(val)) {
-                consumed_count.fetch_add(1, std::memory_order_relaxed);
+    stats.throughput_msg_sec = count / total_seconds;
+    stats.data_rate_mb_sec = (total_bytes / (1024.0 * 1024.0)) / total_seconds;
+
+    return stats;
+}
+
+void benchmark_ring_buffer(size_t total_items) {
+    std::cout << "\n=======================================================\n"
+              << "  [1/2] BENCHMARKING RAW HYDRA RING BUFFER (Zero-Alloc)\n"
+              << "=======================================================\n";
+
+    hydra::RingBuffer<std::string> ring(131072); // 128K pre-allocated slots
+    std::string payload(128, 'x'); // 128 bytes
+
+    std::vector<uint64_t> latencies_ns;
+    latencies_ns.resize(total_items);
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    for (size_t i = 0; i < total_items; ++i) {
+        auto t0 = std::chrono::high_resolution_clock::now();
+        ring.push(payload);
+        auto t1 = std::chrono::high_resolution_clock::now();
+        latencies_ns[i] = static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count());
+    }
+
+    auto end = std::chrono::high_resolution_clock::now();
+    double elapsed = std::chrono::duration<double>(end - start).count();
+
+    auto stats = compute_stats(latencies_ns, elapsed, total_items * payload.size());
+
+    std::cout << std::fixed << std::setprecision(2)
+              << "  Total Items Produced : " << total_items << "\n"
+              << "  Elapsed Time         : " << elapsed << " s\n"
+              << "  Throughput           : " << stats.throughput_msg_sec << " msg/sec\n"
+              << "  Bandwidth            : " << stats.data_rate_mb_sec << " MB/sec\n"
+              << "  Latency (P50)        : " << stats.p50_us << " us (" << (stats.p50_us * 1000) << " ns)\n"
+              << "  Latency (P95)        : " << stats.p95_us << " us\n"
+              << "  Latency (P99)        : " << stats.p99_us << " us\n"
+              << "  Latency (Min/Max)    : " << stats.min_us << " us / " << stats.max_us << " us\n";
+}
+
+void benchmark_broker_pipeline(int num_producers, int num_consumers, size_t messages_per_producer) {
+    std::cout << "\n=======================================================\n"
+              << "  [2/2] BENCHMARKING FULL HYDRA BROKER (Partitions + Pool)\n"
+              << "=======================================================\n";
+
+    std::ostringstream sink; // Suppress logger output during benchmark
+    hydra::Broker broker("bench-broker", "India", 8, sink);
+    broker.create_topic("benchmark_topic", 8, "ANY");
+
+    std::string payload(256, 'b'); // 256 bytes payload
+    size_t total_messages = num_producers * messages_per_producer;
+
+    std::vector<std::vector<uint64_t>> worker_latencies(num_producers);
+    for (auto& lats : worker_latencies) {
+        lats.resize(messages_per_producer);
+    }
+
+    std::atomic<bool> start_flag{false};
+    std::atomic<size_t> consumed_count{0};
+
+    // Spawn Consumers reading by offset
+    std::vector<std::thread> consumer_threads;
+    consumer_threads.reserve(num_consumers);
+    std::atomic<bool> consumers_stop{false};
+
+    for (int c = 0; c < num_consumers; ++c) {
+        consumer_threads.emplace_back([&broker, &consumers_stop, &consumed_count, c, num_consumers] {
+            uint32_t partition_id = c % 8;
+            uint64_t offset = 0;
+            while (!consumers_stop.load(std::memory_order_relaxed)) {
+                auto msgs = broker.fetch("benchmark_topic", partition_id, offset, 50);
+                if (!msgs.empty()) {
+                    consumed_count.fetch_add(msgs.size(), std::memory_order_relaxed);
+                    offset += msgs.size();
+                } else {
+                    std::this_thread::yield();
+                }
             }
         });
     }
 
-    for (int i = 0; i < num_producers; ++i) {
-        producers.emplace_back([&queue, num_messages, &payload] {
-            for (int m = 0; m < num_messages; ++m) {
-                queue.push(payload);
+    // Spawn Producers
+    std::vector<std::thread> producer_threads;
+    producer_threads.reserve(num_producers);
+
+    for (int p = 0; p < num_producers; ++p) {
+        producer_threads.emplace_back([&broker, &start_flag, &worker_latencies, p, messages_per_producer, &payload] {
+            while (!start_flag.load(std::memory_order_acquire)) {
+                std::this_thread::yield();
+            }
+
+            std::string key = "user_" + std::to_string(p);
+            for (size_t m = 0; m < messages_per_producer; ++m) {
+                auto t0 = std::chrono::high_resolution_clock::now();
+                broker.produce("benchmark_topic", key, payload);
+                auto t1 = std::chrono::high_resolution_clock::now();
+                worker_latencies[p][m] = static_cast<uint64_t>(
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count()
+                );
             }
         });
     }
 
-    for (auto& t : producers) {
-        t.join();
+    // Start benchmark timing
+    auto start = std::chrono::high_resolution_clock::now();
+    start_flag.store(true, std::memory_order_release);
+
+    for (auto& pt : producer_threads) {
+        pt.join();
     }
 
-    queue.close();
+    auto end = std::chrono::high_resolution_clock::now();
+    double elapsed = std::chrono::duration<double>(end - start).count();
 
-    for (auto& t : consumers) {
-        t.join();
+    consumers_stop.store(true, std::memory_order_relaxed);
+    for (auto& ct : consumer_threads) {
+        ct.join();
     }
 
-    auto end_time = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end_time - start_time;
+    // Aggregate all producer latencies
+    std::vector<uint64_t> all_latencies;
+    all_latencies.reserve(total_messages);
+    for (const auto& lats : worker_latencies) {
+        all_latencies.insert(all_latencies.end(), lats.begin(), lats.end());
+    }
 
-    double throughput = (static_cast<double>(num_producers) * num_messages) / elapsed.count();
-    double data_rate = (throughput * 100) / (1024.0 * 1024.0);
+    auto stats = compute_stats(all_latencies, elapsed, total_messages * payload.size());
 
-    std::cout << "  \"raw_queue\": {\n"
-              << "    \"elapsed_seconds\": " << elapsed.count() << ",\n"
-              << "    \"messages_per_sec\": " << throughput << ",\n"
-              << "    \"mb_per_sec\": " << data_rate << "\n"
-              << "  },\n";
+    std::cout << std::fixed << std::setprecision(2)
+              << "  Producers / Consumers: " << num_producers << " / " << num_consumers << "\n"
+              << "  Total Messages       : " << total_messages << "\n"
+              << "  Elapsed Time         : " << elapsed << " s\n"
+              << "  Throughput           : " << stats.throughput_msg_sec << " msg/sec\n"
+              << "  Bandwidth            : " << stats.data_rate_mb_sec << " MB/sec\n"
+              << "  Latency (P50 Median) : " << stats.p50_us << " us (" << (stats.p50_us * 1000) << " ns)\n"
+              << "  Latency (P95)        : " << stats.p95_us << " us\n"
+              << "  Latency (P99 Tail)   : " << stats.p99_us << " us\n"
+              << "  Latency (Min/Max)    : " << stats.min_us << " us / " << stats.max_us << " us\n"
+              << "=======================================================\n";
+
+    broker.shutdown();
 }
 
-void benchmark_broker(int num_producers, int num_consumers, int num_messages, int pool_size) {
-    NullStream null_stream;
+int main() {
+    // 1. Raw RingBuffer benchmark (500K items)
+    benchmark_ring_buffer(500000);
 
-    auto start_time = std::chrono::high_resolution_clock::now();
-
-    {
-        mini_kafka::Broker broker(null_stream, pool_size);
-        broker.create_topic("benchmark_topic");
-
-        std::atomic<std::size_t> consumed_count{0};
-        for (int i = 0; i < num_consumers; ++i) {
-            broker.launch_consumer("consumer-" + std::to_string(i), "benchmark_topic", [&consumed_count](const mini_kafka::Message&) {
-                consumed_count.fetch_add(1, std::memory_order_relaxed);
-            }, true);
-        }
-
-        for (int i = 0; i < num_producers; ++i) {
-            broker.launch_producer("producer-" + std::to_string(i), "benchmark_topic", num_messages, std::chrono::milliseconds(0));
-        }
-
-        broker.shutdown();
-    }
-
-    auto end_time = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end_time - start_time;
-
-    double throughput = (static_cast<double>(num_producers) * num_messages) / elapsed.count();
-    double data_rate = (throughput * 45.0) / (1024.0 * 1024.0);
-
-    std::cout << "  \"broker\": {\n"
-              << "    \"elapsed_seconds\": " << elapsed.count() << ",\n"
-              << "    \"messages_per_sec\": " << throughput << ",\n"
-              << "    \"mb_per_sec\": " << data_rate << "\n"
-              << "  }\n";
-}
-
-int main(int argc, char* argv[]) {
-    int num_producers = 4;
-    int num_consumers = 4;
-    int messages_per_producer = 50000;
-    int queue_capacity = 10000;
-    int pool_size = 4;
-
-    if (argc > 1) num_producers = std::stoi(argv[1]);
-    if (argc > 2) num_consumers = std::stoi(argv[2]);
-    if (argc > 3) messages_per_producer = std::stoi(argv[3]);
-    if (argc > 4) queue_capacity = std::stoi(argv[4]);
-    if (argc > 5) pool_size = std::stoi(argv[5]);
-
-    std::cout << "{\n"
-              << "  \"parameters\": {\n"
-              << "    \"producers\": " << num_producers << ",\n"
-              << "    \"consumers\": " << num_consumers << ",\n"
-              << "    \"messages_per_producer\": " << messages_per_producer << ",\n"
-              << "    \"queue_capacity\": " << queue_capacity << ",\n"
-              << "    \"pool_size\": " << pool_size << "\n"
-              << "  },\n";
-
-    benchmark_raw_queue(num_producers, num_consumers, messages_per_producer, queue_capacity);
-    benchmark_broker(num_producers, num_consumers, messages_per_producer, pool_size);
-
-    std::cout << "}\n";
+    // 2. Full Multi-Threaded Broker Pipeline (4 Producers, 4 Consumers, 100K messages)
+    benchmark_broker_pipeline(4, 4, 25000);
 
     return 0;
 }

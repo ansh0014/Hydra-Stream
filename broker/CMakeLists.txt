@@ -40,6 +40,15 @@ target_link_libraries(hydra_broker
         hydra_core
 )
 
+add_executable(hydra_benchmark
+    benchmark/benchmark.cpp
+)
+
+target_link_libraries(hydra_benchmark
+    PRIVATE
+        hydra_core
+)
+
 enable_testing()
 
 add_executable(test_concurrent_queue tests/test_concurrent_queue.cpp)
