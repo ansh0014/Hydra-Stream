@@ -1,85 +1,70 @@
 flowchart TB
-    %% ================= GLOBAL INGRESS & CLIENTS =================
-    subgraph CLIENT_LAYER["1. Ingress & Workload Layer"]
+    subgraph CLIENT_LAYER["1. Ingress and Workload Layer"]
         PROD["Producers (Franz-Go / C++ Client)"]
-        CONS["Consumers (Sequential Readers)"]
+        CONS["Consumers (Sequential Log Readers)"]
     end
 
-    %% ================= L4 DYNAMIC PROXY =================
-    subgraph PROXY_LAYER["2. Dynamic L4 Proxy Layer (Open Source)"]
-        ENVOY["Envoy L4 Proxy\n(envoyproxy/envoy)\nPort 9000 Ingress"]
+    subgraph PROXY_LAYER["2. Dynamic L4 Proxy Layer"]
+        ENVOY["Envoy L4 Proxy (envoyproxy/envoy)"]
     end
 
-    %% ================= CONTROL PLANE & METADATA =================
-    subgraph CONTROL_LAYER["3. Hydra Control Plane (Go)"]
-        CTRL["Hydra Controller Service\n(Go 1.22 Daemon)"]
-        POLICY["Legal Residency Policy Engine\n(EU GDPR / India / APAC)"]
-        ROUTER["Latency-Aware Router\nScore = 1000 / (RTT * (1+Loss) + 1)"]
-        XDS_SERVER["Dynamic Envoy xDS Server\n(go-control-plane)"]
+    subgraph CONTROL_LAYER["3. Hydra Control Plane (Go Daemon)"]
+        CTRL["Hydra Controller Service"]
+        POLICY["Legal Residency Policy Engine"]
+        ROUTER["Latency-Aware Scoring Router"]
+        XDS_SERVER["Dynamic Envoy xDS Server"]
         
-        CTRL --- POLICY
-        CTRL --- ROUTER
-        CTRL --- XDS_SERVER
+        CTRL --> POLICY
+        CTRL --> ROUTER
+        CTRL --> XDS_SERVER
     end
 
-    %% ================= OPEN SOURCE METADATA & TELEMETRY =================
-    subgraph OPEN_SOURCE_INFRA["4. Open-Source Discovery & Observability"]
-        ETCD[("etcd v3 Cluster (CNCF)\n(etcd-io/etcd)\nDynamic Leases & TTL Heartbeats\nPrefix: /registry/brokers/*")]
-        PROM[("Prometheus Server (CNCF)\n(prometheus/prometheus)\nTime-Series Latency Metrics\nPromQL Engine")]
+    subgraph OPEN_SOURCE_INFRA["4. Discovery and Observability"]
+        ETCD[("etcd v3 Cluster (CNCF etcd-io/etcd)")]
+        PROM[("Prometheus Server (CNCF prometheus)")]
     end
 
-    %% ================= CHAOS ENGINE =================
-    subgraph CHAOS_LAYER["5. Real Chaos Engineering (Kernel Level)"]
-        CHAOS["Chaos Mesh / Linux tc netem\n(shemminger/iproute2)\nReal Kernel Delay Injection\ntc qdisc add dev eth0 root netem delay 260ms"]
+    subgraph CHAOS_LAYER["5. Kernel Chaos Engine"]
+        CHAOS["Chaos Mesh and Linux tc netem"]
     end
 
-    %% ================= 3-REGION C++ BROKER CLUSTER =================
-    subgraph REGIONS["6. Distributed Hydra C++ Broker Nodes (3 Regions)"]
+    subgraph REGIONS["6. Distributed Hydra C++ Brokers (3 Regions)"]
         subgraph REGION_INDIA["Region: India"]
-            BR_IN["Broker India (C++)\nTCP Port 9092\nHealth Port 8081"]
-            ROCKS_IN[("Embedded RocksDB\n(facebook/rocksdb)\nLocal SSD Partition Log")]
-            BR_IN --- ROCKS_IN
+            BR_IN["Broker India (Port 9092)"]
+            ROCKS_IN[("Embedded RocksDB Log")]
+            BR_IN --> ROCKS_IN
         end
 
-        subgraph REGION_GERMANY["Region: Germany (EU Legal Jurisdiction)"]
-            BR_DE["Broker Germany (C++)\nTCP Port 9093\nHealth Port 8082"]
-            ROCKS_DE[("Embedded RocksDB\n(facebook/rocksdb)\nLocal SSD Partition Log")]
-            BR_DE --- ROCKS_DE
+        subgraph REGION_GERMANY["Region: Germany (EU GDPR)"]
+            BR_DE["Broker Germany (Port 9093)"]
+            ROCKS_DE[("Embedded RocksDB Log")]
+            BR_DE --> ROCKS_DE
         end
 
         subgraph REGION_SINGAPORE["Region: Singapore"]
-            BR_SG["Broker Singapore (C++)\nTCP Port 9094\nHealth Port 8083"]
-            ROCKS_SG[("Embedded RocksDB\n(facebook/rocksdb)\nLocal SSD Partition Log")]
-            BR_SG --- ROCKS_SG
+            BR_SG["Broker Singapore (Port 9094)"]
+            ROCKS_SG[("Embedded RocksDB Log")]
+            BR_SG --> ROCKS_SG
         end
     end
 
-    %% ================= CONNECTION FLOWS =================
+    BR_IN -->|"1. Lease and Heartbeat gRPC"| ETCD
+    BR_DE -->|"1. Lease and Heartbeat gRPC"| ETCD
+    BR_SG -->|"1. Lease and Heartbeat gRPC"| ETCD
 
-    %% 1. Dynamic Registration (No Hardcoded Brokers)
-    BR_IN -.->|"1. Register Lease & TTL Heartbeat (gRPC)"| ETCD
-    BR_DE -.->|"1. Register Lease & TTL Heartbeat (gRPC)"| ETCD
-    BR_SG -.->|"1. Register Lease & TTL Heartbeat (gRPC)"| ETCD
+    ETCD -->|"2. Prefix Watch brokers"| CTRL
 
-    %% 2. Control Plane watches etcd
-    ETCD ==>|"2. Prefix Watch (/registry/brokers/*)"| CTRL
+    PROM -->|"3a. Scrape Latency RTT"| BR_IN
+    PROM -->|"3a. Scrape Latency RTT"| BR_DE
+    PROM -->|"3a. Scrape Latency RTT"| BR_SG
+    CTRL -->|"3b. PromQL Latency Query"| PROM
 
-    %% 3. Prometheus Scrapes Brokers & Control Plane queries Prometheus
-    PROM -.->|"3a. Scrape Latency & Probe RTT"| BR_IN
-    PROM -.->|"3a. Scrape Latency & Probe RTT"| BR_DE
-    PROM -.->|"3a. Scrape Latency & Probe RTT"| BR_SG
-    CTRL <==>|"3b. Query Link RTT via PromQL API"| PROM
+    CHAOS -->|"4. Kernel Delay 260ms"| BR_IN
 
-    %% 4. Chaos Injection
-    CHAOS ==>|"4. Kernel Traffic Delay / Packet Drop"| BR_IN
+    XDS_SERVER -->|"5. Push EDS Routes"| ENVOY
 
-    %% 5. Dynamic Envoy xDS Update
-    XDS_SERVER ==>|"5. Push EDS Cluster Routes (gRPC xDS)"| ENVOY
-
-    %% 6. Ingress Traffic Routing
-    PROD -->|"6. Publish Messages (Wire Protocol: Magic 0x48)"| ENVOY
-    ENVOY -->|"7a. Route Germany GDPR Streams"| BR_DE
-    ENVOY -->|"7b. Route Local Indian Traffic"| BR_IN
-    ENVOY -->|"7c. Bypass Degraded India Link to Singapore"| BR_SG
-
-    CONS -->|"8. Sequential Offset Fetch"| ENVOY
+    PROD -->|"6. Produce Messages"| ENVOY
+    ENVOY -->|"7a. Route GDPR to Germany"| BR_DE
+    ENVOY -->|"7b. Route Local to India"| BR_IN
+    ENVOY -->|"7c. Bypass Degraded Link to Singapore"| BR_SG
+    CONS -->|"8. Fetch Monotonic Offsets"| ENVOY
