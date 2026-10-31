@@ -1,0 +1,53 @@
+schema_version: 1
+
+experiment:
+  name: regional-blackout-eu-isolation
+  seed: 12345
+  duration: 120s
+  target_sdg: "SDG 9.1 & EU GDPR Article 44"
+  tags: [outage, failover, quarantine, zero-leak]
+
+cluster:
+  provider: docker-compose
+  registry: etcd
+  discovery_endpoint: "http://127.0.0.1:2379"
+  metrics_endpoint: "http://127.0.0.1:9090"
+  regions:
+    - name: India
+      brokers: [broker-india-1]
+    - name: Germany
+      brokers: [broker-germany-1]
+      legal_jurisdiction: EU_GDPR
+    - name: Singapore
+      brokers: [broker-singapore-1]
+  require_disposable_environment: true
+
+topics:
+  - name: gdpr-user-audit
+    legal_region: Germany
+    partitions: 4
+  - name: global-telemetry
+    legal_region: ANY
+    partitions: 6
+
+faults:
+  - id: blackout-germany
+    tool: "docker-container-stop"
+    target_container: "hydra-broker-germany"
+    at: 15s
+    duration: 30s
+    action: "stop"
+    command: "docker stop hydra-broker-germany"
+    recovery_command: "docker start hydra-broker-germany"
+
+assertions:
+  - id: zero-residency-leak
+    type: legal_data_residency_quarantined
+    target_topic: gdpr-user-audit
+    allowed_region: Germany
+    strict_rejection_expected: true
+
+  - id: non-freezing-global-traffic
+    type: global_traffic_rerouted
+    target_topic: global-telemetry
+    alternate_region: Singapore

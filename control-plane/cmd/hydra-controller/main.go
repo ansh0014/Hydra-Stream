@@ -35,7 +35,7 @@ func NewControllerServer(cfg *config.Config) *ControllerServer {
 	if cfg.SeedFallback {
 		log.Println("[Hydra Controller] Pre-seeding fallback topology (SEED_FALLBACK=true)...")
 		reg.Register(types.BrokerNode{
-			ID:         "broker-india",
+			ID:         "broker-india-1",
 			Region:     "India",
 			Endpoint:   "127.0.0.1:9092",
 			HealthPort: 9092,
@@ -43,7 +43,7 @@ func NewControllerServer(cfg *config.Config) *ControllerServer {
 			RTT:        10 * time.Millisecond,
 		})
 		reg.Register(types.BrokerNode{
-			ID:         "broker-germany",
+			ID:         "broker-germany-1",
 			Region:     "Germany",
 			Endpoint:   "127.0.0.1:9093",
 			HealthPort: 9093,
@@ -51,7 +51,7 @@ func NewControllerServer(cfg *config.Config) *ControllerServer {
 			RTT:        85 * time.Millisecond,
 		})
 		reg.Register(types.BrokerNode{
-			ID:         "broker-singapore",
+			ID:         "broker-singapore-1",
 			Region:     "Singapore",
 			Endpoint:   "127.0.0.1:9094",
 			HealthPort: 9094,
@@ -125,37 +125,6 @@ func (s *ControllerServer) handleRouteResolve(w http.ResponseWriter, r *http.Req
 	_ = json.NewEncoder(w).Encode(decision)
 }
 
-type LatencyInjectRequest struct {
-	BrokerID string  `json:"broker_id"`
-	RTTMs    int64   `json:"rtt_ms"`
-	Loss     float64 `json:"packet_loss"`
-	Status   string  `json:"status"`
-}
-
-func (s *ControllerServer) handleLatencyInject(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	var req LatencyInjectRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	err := s.registry.UpdateMetrics(req.BrokerID, time.Duration(req.RTTMs)*time.Millisecond, req.Loss, req.Status)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{
-		"message": fmt.Sprintf("Updated %s: RTT=%dms Loss=%.2f Status=%s", req.BrokerID, req.RTTMs, req.Loss, req.Status),
-	})
-}
-
 func main() {
 	envFile := flag.String("env", "config/hydra.env", "Path to environment config file")
 	portFlag := flag.Int("port", 0, "Override port for HTTP API")
@@ -220,7 +189,6 @@ func main() {
 	http.HandleFunc("/health", server.handleHealth)
 	http.HandleFunc("/cluster/topology", server.handleTopology)
 	http.HandleFunc("/route/resolve", server.handleRouteResolve)
-	http.HandleFunc("/simulation/latency", server.handleLatencyInject)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	log.Printf("[Hydra Control Plane] Coordinator daemon listening on %s...\n", addr)
