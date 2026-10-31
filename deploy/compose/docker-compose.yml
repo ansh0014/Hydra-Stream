@@ -30,6 +30,22 @@ services:
     networks:
       - hydra-mesh
 
+  # Dynamic L4 Envoy Proxy
+  envoy:
+    image: envoyproxy/envoy:v1.29.2
+    container_name: hydra-envoy
+    volumes:
+      - ./envoy.yaml:/etc/envoy/envoy.yaml:ro
+    command: ["envoy", "-c", "/etc/envoy/envoy.yaml"]
+    ports:
+      - "9000:9000"
+    depends_on:
+      - broker-india
+      - broker-germany
+      - broker-singapore
+    networks:
+      - hydra-mesh
+
   # Regional Broker Node 1: India
   broker-india:
     build:
