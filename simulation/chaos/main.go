@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"os/exec"
-	"runtime"
 )
 
 type RouteRequest struct {
@@ -50,14 +49,10 @@ func queryRoute(controllerURL, topic, clientRegion string) (*RouteDecision, erro
 func executeKernelFault(container string, action string, delay string, jitter string, loss string) error {
 	log.Printf("[Chaos Engine] Executing Linux kernel tc netem on %s (action=%s, delay=%s)...", container, action, delay)
 	var cmd *exec.Cmd
-	if runtime.GOOS == "windows" {
-		if action == "apply" {
-			cmd = exec.Command("docker", "exec", "--privileged", container, "tc", "qdisc", "replace", "dev", "eth0", "root", "netem", "delay", delay, jitter, "loss", loss)
-		} else {
-			cmd = exec.Command("docker", "exec", "--privileged", container, "tc", "qdisc", "del", "dev", "eth0", "root")
-		}
+	if action == "apply" {
+		cmd = exec.Command("docker", "exec", "--privileged", container, "tc", "qdisc", "replace", "dev", "eth0", "root", "netem", "delay", delay, jitter, "loss", loss)
 	} else {
-		cmd = exec.Command("./scripts/chaos-netem.sh", container, action, delay, jitter, loss)
+		cmd = exec.Command("docker", "exec", "--privileged", container, "tc", "qdisc", "del", "dev", "eth0", "root")
 	}
 
 	out, err := cmd.CombinedOutput()

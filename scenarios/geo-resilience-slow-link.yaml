@@ -43,8 +43,8 @@ faults:
     at: 10s
     duration: 30s
     action: "delay 260ms 15ms loss 10%"
-    script_command: "./scripts/chaos-netem.sh hydra-broker-india apply 260ms 15ms 10%"
-    recovery_command: "./scripts/chaos-netem.sh hydra-broker-india clear"
+    script_command: "scripts\\hydra.bat chaos hydra-broker-india apply 260ms 15ms 10%"
+    recovery_command: "scripts\\hydra.bat chaos hydra-broker-india clear"
 
 assertions:
   - id: legal-residency-enforced
