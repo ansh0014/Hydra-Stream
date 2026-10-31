@@ -3,7 +3,7 @@
 ```mermaid
 flowchart TB
     subgraph CLIENT_LAYER["1. Ingress and Workload Layer"]
-        PROD["Producers (Franz-Go and C++ Client)"]
+        PROD["Producers (Franz-Go / C++ Client)"]
         CONS["Consumers (Sequential Log Readers)"]
     end
 
@@ -51,28 +51,22 @@ flowchart TB
         end
     end
 
-    %% Registration
-    BR_IN -.->|"1. Lease and Heartbeat gRPC"| ETCD
-    BR_DE -.->|"1. Lease and Heartbeat gRPC"| ETCD
-    BR_SG -.->|"1. Lease and Heartbeat gRPC"| ETCD
+    BR_IN -->|"1. Lease and Heartbeat gRPC"| ETCD
+    BR_DE -->|"1. Lease and Heartbeat gRPC"| ETCD
+    BR_SG -->|"1. Lease and Heartbeat gRPC"| ETCD
 
-    %% Discovery Watch
-    ETCD ==>|"2. Prefix Watch brokers"| CTRL
+    ETCD -->|"2. Prefix Watch brokers"| CTRL
 
-    %% Telemetry & Probes
-    PROM -.->|"3a. Scrape Latency RTT"| BR_IN
-    PROM -.->|"3a. Scrape Latency RTT"| BR_DE
-    PROM -.->|"3a. Scrape Latency RTT"| BR_SG
-    CTRL <==>|"3b. PromQL Query"| PROM
+    PROM -->|"3a. Scrape Latency RTT"| BR_IN
+    PROM -->|"3a. Scrape Latency RTT"| BR_DE
+    PROM -->|"3a. Scrape Latency RTT"| BR_SG
+    CTRL -->|"3b. PromQL Latency Query"| PROM
 
-    %% Fault Injection
-    CHAOS ==>|"4. Kernel Delay 260ms"| BR_IN
+    CHAOS -->|"4. Kernel Delay 260ms"| BR_IN
 
-    %% xDS Config Push
-    XDS_SERVER ==>|"5. Push EDS Routes"| ENVOY
+    XDS_SERVER -->|"5. Push EDS Routes"| ENVOY
 
-    %% Ingress & Routing
-    PROD -->|"6. Produce Magic 0x48"| ENVOY
+    PROD -->|"6. Produce Messages"| ENVOY
     ENVOY -->|"7a. Route GDPR to Germany"| BR_DE
     ENVOY -->|"7b. Route Local to India"| BR_IN
     ENVOY -->|"7c. Bypass Degraded Link to Singapore"| BR_SG
