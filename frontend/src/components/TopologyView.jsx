@@ -484,29 +484,33 @@ export default function TopologyView({ regions, throughput, totalMessages, gdprP
     };
   }, [regions]);
 
-  // Telemetry Chart Data
+  // Telemetry Chart Data - Driven by dynamic cluster metrics
   const throughputData = {
     labels: Array(20).fill(''),
     datasets: [
       {
         label: 'Ingress Throughput (msg/s)',
-        data: Array(20).fill(309500).map((v) => v + (Math.random() * 8000 - 4000)),
+        data: Array(20).fill(throughput || 0),
         borderColor: '#ffffff',
         borderWidth: 1.5,
         backgroundColor: 'rgba(255, 255, 255, 0.05)',
-        tension: 0.3,
+        tension: 0.1,
         fill: true,
         pointRadius: 0,
       },
     ],
   };
 
+  const rttValues = Object.values(regions || {}).map((r) => r.rtt || 0).filter((v) => v > 0);
+  const avgRtt = rttValues.length > 0 ? +(rttValues.reduce((a, b) => a + b, 0) / rttValues.length).toFixed(1) : 0;
+  const maxRtt = rttValues.length > 0 ? Math.max(...rttValues) : 0;
+
   const latencyData = {
-    labels: ['P50 (Core)', 'P50 (Pipe)', 'P75', 'P90', 'P95', 'P99'],
+    labels: ['P50 RingBuffer (µs)', 'India RTT (ms)', 'Germany RTT (ms)', 'Singapore RTT (ms)', 'Cluster Mean (ms)', 'Max Link (ms)'],
     datasets: [
       {
-        label: 'Latency (µs)',
-        data: [0.20, 6.8, 12.4, 28.1, 44.9, 65.7],
+        label: 'Live Latency Metrics',
+        data: [0.20, regions.india?.rtt || 0, regions.germany?.rtt || 0, regions.singapore?.rtt || 0, avgRtt, maxRtt],
         backgroundColor: [
           'rgba(255, 255, 255, 0.9)',
           'rgba(255, 255, 255, 0.75)',
@@ -648,7 +652,7 @@ export default function TopologyView({ regions, throughput, totalMessages, gdprP
             <h3 className="text-xs font-medium text-white font-mono uppercase tracking-wider">
               Ingress Telemetry (msg/sec)
             </h3>
-            <span className="text-xs font-mono text-gray-400">Live: 309.5k msg/s</span>
+            <span className="text-xs font-mono text-gray-400">Live: {throughput > 0 ? `${(throughput / 1000).toFixed(1)}k msg/s` : '0 msg/s (Standby)'}</span>
           </div>
           <div className="h-60">
             <Line

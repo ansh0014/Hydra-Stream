@@ -1,7 +1,15 @@
 import React from 'react';
 import { Shield, FileText, CheckCircle2 } from 'lucide-react';
 
-export default function ComplianceVaultView() {
+export default function ComplianceVaultView({
+  topics = [],
+  regions = {},
+  messages = [],
+  totalMessages = 0,
+  gdprPrevented = 0,
+}) {
+  const countFor = (tName) => messages.filter((m) => m.topic === tName).length;
+
   const handleExport = () => {
     alert('Exporting executive compliance audit certificate (JSON/PDF)...');
   };
@@ -59,7 +67,7 @@ export default function ComplianceVaultView() {
           </p>
           <div className="mt-4 pt-4 border-t border-emerald-500/20 font-mono text-xs text-emerald-400 flex items-center gap-1.5">
             <CheckCircle2 size={14} />
-            <span>Domestic Stash: <strong>1,420,890 Transactions</strong></span>
+            <span>Domestic Stash: <strong>{countFor('upi-transactions')} Transactions</strong></span>
           </div>
         </div>
 
@@ -102,22 +110,22 @@ export default function ComplianceVaultView() {
             <tbody className="divide-y divide-white/5">
               <tr>
                 <td className="py-3.5 px-3 text-white font-medium">Topic: gdpr-user-audit</td>
-                <td className="py-3.5 px-3 text-gray-300">341,820 msgs</td>
-                <td className="py-3.5 px-3 text-gray-300">341,820 msgs</td>
+                <td className="py-3.5 px-3 text-gray-300">{countFor('gdpr-user-audit')} msgs</td>
+                <td className="py-3.5 px-3 text-gray-300">Offset #{countFor('gdpr-user-audit')}</td>
                 <td className="py-3.5 px-3 text-purple-300 font-semibold">0 bytes (100% Locked)</td>
                 <td className="py-3.5 px-3 text-emerald-400 font-medium">🛡️ STRICT PASS</td>
               </tr>
               <tr>
                 <td className="py-3.5 px-3 text-white font-medium">Topic: upi-transactions</td>
-                <td className="py-3.5 px-3 text-gray-300">1,420,890 msgs</td>
-                <td className="py-3.5 px-3 text-gray-300">1,420,890 msgs</td>
+                <td className="py-3.5 px-3 text-gray-300">{countFor('upi-transactions')} msgs</td>
+                <td className="py-3.5 px-3 text-gray-300">Offset #{countFor('upi-transactions')}</td>
                 <td className="py-3.5 px-3 text-emerald-300 font-semibold">0 bytes (Domestic)</td>
                 <td className="py-3.5 px-3 text-emerald-400 font-medium">🛡️ STRICT PASS</td>
               </tr>
               <tr>
                 <td className="py-3.5 px-3 text-white font-medium">Topic: global-telemetry</td>
-                <td className="py-3.5 px-3 text-gray-300">4,891,040 msgs</td>
-                <td className="py-3.5 px-3 text-gray-300">4,891,040 msgs</td>
+                <td className="py-3.5 px-3 text-gray-300">{countFor('global-telemetry')} msgs</td>
+                <td className="py-3.5 px-3 text-gray-300">Offset #{countFor('global-telemetry')}</td>
                 <td className="py-3.5 px-3 text-gray-400">Global Transit</td>
                 <td className="py-3.5 px-3 text-white font-medium">⚡ OPTIMIZED PASS</td>
               </tr>

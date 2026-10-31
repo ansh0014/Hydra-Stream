@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowRight, ArrowUpRight, Shield, Zap, Globe, Cpu, Check, Layers, Play } from 'lucide-react';
 
-export default function LandingView({ setActiveTab }) {
+export default function LandingView({ setActiveTab, throughput = 0, totalMessages = 0, gdprPrevented = 0, regions = {} }) {
   return (
     <section className="relative min-h-screen flex flex-col items-center justify-start px-6 pt-28 pb-20 animate-fade-in">
       
@@ -108,8 +108,12 @@ export default function LandingView({ setActiveTab }) {
             </div>
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
               <div className="text-[11px] font-mono text-gray-400 uppercase">Pipeline Ingress</div>
-              <div className="text-2xl font-semibold text-white mt-1 font-mono">309,597</div>
-              <div className="text-[11px] text-gray-400 font-mono mt-0.5">msg/sec (~79.2 MB/s)</div>
+              <div className="text-2xl font-semibold text-white mt-1 font-mono">
+                {throughput > 0 ? throughput.toLocaleString() : 'Standby'}
+              </div>
+              <div className="text-[11px] text-gray-400 font-mono mt-0.5">
+                {throughput > 0 ? `msg/sec (~${(throughput * 256 / 1024 / 1024).toFixed(1)} MB/s)` : 'Awaiting live traffic'}
+              </div>
             </div>
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
               <div className="text-[11px] font-mono text-gray-400 uppercase">Residency Compliance</div>
@@ -126,7 +130,7 @@ export default function LandingView({ setActiveTab }) {
           {/* Call to Launch inside Chrome */}
           <div className="mt-6 pt-5 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
             <span className="text-xs text-gray-400 font-mono">
-              3 Regions Online: Mumbai (9092) • Frankfurt (9093) • Singapore (9094)
+              Active Regions: {Object.values(regions).filter(r => r.status === 'HEALTHY').length} / {Object.keys(regions).length} Online (Mumbai :9092 • Frankfurt :9093 • Singapore :9094)
             </span>
             <button
               onClick={() => setActiveTab('topology')}

@@ -13,8 +13,8 @@ function buildInitialRegions() {
       id: 'broker-india-1',
       endpoint: '127.0.0.1:9092',
       healthPort: 8081,
-      status: 'HEALTHY',
-      rtt: 10,
+      status: 'INITIALIZING',
+      rtt: 0,
       packetLoss: 0.0,
       boundTopics: ['upi-transactions', 'orders-india', 'global-telemetry'],
       ...REGION_METADATA.india,
@@ -23,8 +23,8 @@ function buildInitialRegions() {
       id: 'broker-germany-1',
       endpoint: '127.0.0.1:9093',
       healthPort: 8082,
-      status: 'HEALTHY',
-      rtt: 85,
+      status: 'INITIALIZING',
+      rtt: 0,
       packetLoss: 0.0,
       boundTopics: ['gdpr-user-audit', 'eu-payments'],
       ...REGION_METADATA.germany,
@@ -33,8 +33,8 @@ function buildInitialRegions() {
       id: 'broker-singapore-1',
       endpoint: '127.0.0.1:9094',
       healthPort: 8083,
-      status: 'HEALTHY',
-      rtt: 40,
+      status: 'INITIALIZING',
+      rtt: 0,
       packetLoss: 0.0,
       boundTopics: ['apac-fx', 'global-telemetry'],
       ...REGION_METADATA.singapore,
@@ -47,8 +47,8 @@ export default function App() {
   const [regions, setRegions] = useState(buildInitialRegions);
   const [topics, setTopics] = useState(CLUSTER_TOPICS);
   const [messages, setMessages] = useState([]);
-  const [clusterHealth, setClusterHealth] = useState('HEALTHY');
-  const [throughput, setThroughput] = useState(309597);
+  const [clusterHealth, setClusterHealth] = useState('SYNCING');
+  const [throughput, setThroughput] = useState(0);
   const [totalMessages, setTotalMessages] = useState(0);
   const [gdprPrevented, setGdprPrevented] = useState(0);
   const [activeChaos, setActiveChaos] = useState(null);
@@ -66,7 +66,7 @@ export default function App() {
   const logEvent = (category, message, level = 'info') => {
     const time = new Date().toTimeString().split(' ')[0];
     const newEvt = {
-      id: 'evt_' + Math.random().toString(36).substring(2, 9),
+      id: 'evt_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
       timestamp: time,
       category,
       message,
@@ -89,7 +89,6 @@ export default function App() {
               next[key].endpoint = b.endpoint;
               next[key].status = b.status || 'HEALTHY';
               if (b.rtt) {
-                // Convert nanoseconds to milliseconds if needed
                 next[key].rtt = b.rtt > 1000000 ? Math.round(b.rtt / 1000000) : b.rtt;
               }
               next[key].packetLoss = b.packet_loss || 0.0;
@@ -97,10 +96,11 @@ export default function App() {
           });
           return next;
         });
+        setClusterHealth('HEALTHY');
         logEvent('Discovery', `etcd cluster sync: ${data.brokers.length} live brokers active.`, 'success');
       }
     } catch (err) {
-      // Background sync notification
+      setClusterHealth('DEGRADED');
     }
   };
 
@@ -110,15 +110,28 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  // Heartbeat live rate ticker
+  // Live cluster metrics sync from Prometheus / Control Plane
   useEffect(() => {
-    const timer = setInterval(() => {
-      setThroughput((prev) => Math.max(100000, Math.round(prev + (Math.random() * 4000 - 2000))));
-      setTotalMessages((prev) => prev + Math.floor(throughput / 60));
-    }, 1500);
-
-    return () => clearInterval(timer);
-  }, [throughput]);
+    const syncMetrics = async () => {
+      try {
+        const res = await fetch('/api/v1/metrics/latency');
+        if (res.ok) {
+          const body = await res.json();
+          if (body && body.data && body.data.result && body.data.result.length > 0) {
+            const val = parseFloat(body.data.result[0].value[1]);
+            if (!isNaN(val) && val > 0) {
+              setThroughput(Math.round(val));
+            }
+          }
+        }
+      } catch (e) {
+        // Prometheus not ready or idle
+      }
+    };
+    syncMetrics();
+    const interval = setInterval(syncMetrics, 4000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Chaos Actions
   const handleInjectSlowLink = () => {
@@ -170,19 +183,15 @@ export default function App() {
   };
 
   const handleInjectBurst = () => {
-    logEvent('Traffic', 'Pumping 100,000 message burst across 8 concurrent worker pipelines...', 'info');
-    setThroughput(425000);
-    setTimeout(() => {
-      setThroughput(309597);
-      logEvent('Traffic', 'Burst completed: 100,000 messages committed to memory ringbuffer. Zero dropped.', 'success');
-    }, 2500);
+    logEvent('Traffic', 'Triggering 100,000 message high-throughput pipeline ingestion...', 'info');
+    logEvent('Traffic', 'For production saturation, run: ./simulation/bin/emulator -rate 300000 -workers 8', 'info');
   };
 
   const handleRestore = () => {
     setActiveChaos(null);
     setClusterHealth('HEALTHY');
-    setRegions(buildInitialRegions());
-    logEvent('ChaosEngine', 'All netem rules flushed. Cluster restored to pristine operational state.', 'success');
+    syncClusterTopology();
+    logEvent('ChaosEngine', 'All netem rules flushed. Cluster restored to dynamic operational state.', 'success');
   };
 
   // Route Resolver logic calling real Go Control Plane API
@@ -220,7 +229,7 @@ export default function App() {
     const newMsg = {
       magic: '0x48',
       topic: topicName,
-      partition: Math.floor(Math.random() * 4),
+      partition: 0,
       offset: newOffset,
       timestamp: new Date().toISOString(),
       key: `client_evt_${Date.now()}`,
@@ -229,6 +238,7 @@ export default function App() {
     };
 
     setMessages((prev) => [newMsg, ...prev]);
+    setTotalMessages((prev) => prev + 1);
     return {
       type: 'success',
       message: `Message committed to ${route.assignedBrokerId} (${route.region}) at Offset #${newOffset}!`,
@@ -256,12 +266,11 @@ export default function App() {
       <main className="flex-1">
         {activeTab === 'landing' && (
           <LandingView
+            setActiveTab={setActiveTab}
             throughput={throughput}
             totalMessages={totalMessages}
             gdprPrevented={gdprPrevented}
-            onOpenTopology={() => setActiveTab('topology')}
-            onOpenKafka={() => setActiveTab('kafka')}
-            onOpenChaos={() => setActiveTab('chaos')}
+            regions={regions}
           />
         )}
 
@@ -304,6 +313,8 @@ export default function App() {
           <ComplianceVaultView
             topics={topics}
             regions={regions}
+            messages={messages}
+            totalMessages={totalMessages}
             gdprPrevented={gdprPrevented}
           />
         )}

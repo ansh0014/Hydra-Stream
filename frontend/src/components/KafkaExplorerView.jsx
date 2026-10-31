@@ -100,7 +100,7 @@ export default function KafkaExplorerView({ topics, messages, onPublishMessage, 
                         </span>
                       </td>
                       <td className="py-3 px-3 text-gray-300 font-medium">
-                        {t.messagesTotal.toLocaleString()}
+                        {(t.messagesTotal ?? messages.filter((m) => m.topic === t.name).length).toLocaleString()}
                       </td>
                     </tr>
                   );

@@ -105,3 +105,41 @@ services:
       - etcd
     networks:
       - hydra-mesh
+
+  # Hydra Sovereign Control Plane (Go Policy & Latency Router)
+  control-plane:
+    build:
+      context: ../../control-plane
+      dockerfile: Dockerfile
+    container_name: hydra-control-plane
+    environment:
+      - CONTROLLER_PORT=8080
+      - ETCD_ENDPOINTS=http://etcd:2379
+      - ENABLE_ETCD=true
+      - PROMETHEUS_URL=http://prometheus:9090
+      - ENABLE_PROMETHEUS=true
+      - SEED_FALLBACK=false
+    ports:
+      - "8080:8080"
+    depends_on:
+      - etcd
+      - prometheus
+    networks:
+      - hydra-mesh
+
+  # Hydra React Dashboard & Express Ingress Proxy
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: Dockerfile
+    container_name: hydra-frontend
+    environment:
+      - PORT=3000
+      - CONTROLLER_URL=http://control-plane:8080
+      - PROMETHEUS_URL=http://prometheus:9090
+    ports:
+      - "3000:3000"
+    depends_on:
+      - control-plane
+    networks:
+      - hydra-mesh

@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hydra-frontend
+  labels:
+    app: hydra-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hydra-frontend
+  template:
+    metadata:
+      labels:
+        app: hydra-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: hydra-frontend:dev
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PORT
+              value: "3000"
+            - name: CONTROLLER_URL
+              value: "http://hydra-controller:8080"
+            - name: PROMETHEUS_URL
+              value: "http://hydra-prometheus:9090"
+          ports:
+            - containerPort: 3000
+              name: http
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hydra-frontend
+  labels:
+    app: hydra-frontend
+spec:
+  type: NodePort
+  ports:
+    - port: 3000
+      targetPort: 3000
+      nodePort: 30000
+      name: http
+  selector:
+    app: hydra-frontend

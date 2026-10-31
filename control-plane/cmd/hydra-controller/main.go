@@ -87,6 +87,28 @@ func (s *ControllerServer) handleTopology(w http.ResponseWriter, r *http.Request
 	})
 }
 
+func (s *ControllerServer) handleMetrics(w http.ResponseWriter, r *http.Request) {
+	brokers := s.registry.ListAll()
+	healthyCount := 0
+	degradedCount := 0
+	for _, b := range brokers {
+		if b.Status == "HEALTHY" {
+			healthyCount++
+		} else if b.Status == "DEGRADED" {
+			degradedCount++
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"active_brokers":   len(brokers),
+		"healthy_brokers":  healthyCount,
+		"degraded_brokers": degradedCount,
+		"etcd_connected":   s.etcdClient != nil,
+		"prom_connected":   s.promClient != nil,
+		"timestamp":        time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
 type RouteRequest struct {
 	Topic        string `json:"topic"`
 	ClientRegion string `json:"client_region"`
@@ -186,13 +208,30 @@ func main() {
 		log.Printf("[Hydra Controller] Prometheus live metrics scraper active on %s\n", cfg.PrometheusURL)
 	}
 
-	http.HandleFunc("/health", server.handleHealth)
-	http.HandleFunc("/cluster/topology", server.handleTopology)
-	http.HandleFunc("/route/resolve", server.handleRouteResolve)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/health", server.handleHealth)
+	mux.HandleFunc("/api/v1/health", server.handleHealth)
+	mux.HandleFunc("/cluster/topology", server.handleTopology)
+	mux.HandleFunc("/api/v1/topology", server.handleTopology)
+	mux.HandleFunc("/route/resolve", server.handleRouteResolve)
+	mux.HandleFunc("/api/v1/route/resolve", server.handleRouteResolve)
+	mux.HandleFunc("/api/v1/metrics", server.handleMetrics)
+
+	// Wrap in CORS middleware
+	corsHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		mux.ServeHTTP(w, r)
+	})
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	log.Printf("[Hydra Control Plane] Coordinator daemon listening on %s...\n", addr)
-	if err := http.ListenAndServe(addr, nil); err != nil {
+	if err := http.ListenAndServe(addr, corsHandler); err != nil {
 		log.Fatalf("Server error: %v\n", err)
 		os.Exit(1)
 	}
