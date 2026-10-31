@@ -1,132 +1,142 @@
-# 09 — Cluster Deployment
+# 09 — Cluster Deployment & Docker Topology
 
-## 1. Initial topology
+## 1. Multi-Region Docker Architecture
 
-The first deployment target is three independent Hydra Stream broker containers on a dedicated Docker Compose network.
+To simulate geographic regions on a single development or CI machine without cloud costs, Hydra Stream deploys an isolated Docker environment with simulated regional boundaries:
 
 ```mermaid
 flowchart TB
-    subgraph SIM[Simulation Environment]
-        CTRL[Go Controller]
-        WG[C++ Workload]
-        FI[Fault Injector]
-        OC[Observation Collector]
-    end
+    subgraph DOCKER_NET["Docker Network: hydra-mesh (172.30.0.0/16)"]
+        subgraph INFRA["Cluster Coordination"]
+            ETCD["etcd:2379\n(Service Registry & Dynamic Discovery)"]
+            PROM["prometheus:9090\n(Latency & Link Quality Metrics)"]
+        end
 
-    subgraph NET[Dedicated Docker Network]
-        A[broker-a]
-        B[broker-b]
-        C[broker-c]
-    end
+        subgraph REGION_IN["Region: India"]
+            BR_IN["hydra-broker-india\nPort: 9092 | Health: 8081\nRegion Tag: India"]
+        end
 
-    WG --> A
-    WG --> B
-    WG --> C
-    CTRL --> FI
-    FI --> A
-    FI --> B
-    FI --> C
-    A --> OC
-    B --> OC
-    C --> OC
+        subgraph REGION_DE["Region: Germany (EU Data Jurisdiction)"]
+            BR_DE["hydra-broker-germany\nPort: 9093 | Health: 8082\nRegion Tag: Germany"]
+        end
+
+        subgraph REGION_SG["Region: Singapore"]
+            BR_SG["hydra-broker-singapore\nPort: 9094 | Health: 8083\nRegion Tag: Singapore"]
+        end
+
+        BR_IN -->|Registers to| ETCD
+        BR_DE -->|Registers to| ETCD
+        BR_SG -->|Registers to| ETCD
+
+        PROM -.->|Scrapes| BR_IN
+        PROM -.->|Scrapes| BR_DE
+        PROM -.->|Scrapes| BR_SG
+    end
 ```
 
-## 2. Container requirements
+---
 
-Each broker should have:
-
-- Unique broker identity.
-- Separate persistent data volume.
-- Explicit configuration.
-- Health check based on broker readiness, not only process existence.
-- Resource limits suitable for repeatable local experiments.
-- Structured logs.
-- Metrics endpoint if implemented.
-- Stable service name and network alias.
-
-## 3. Isolation
-
-Use a dedicated Compose project name and network for simulator runs. Label resources with the run ID where possible. The controller must discover and operate only on resources associated with the expected project and labels.
-
-## 4. Persistence
-
-Use separate volumes for each broker so a restart does not accidentally erase broker data. Define two different operations:
-
-- **Restart:** preserve broker volume.
-- **Reset:** remove/reinitialize only the selected disposable test data, with explicit confirmation.
-
-The MVP crash-recovery experiment uses restart, not reset.
-
-## 5. Compose design sketch
-
-The exact image, executable, ports, configuration flags and health-check command must be adapted after inspecting Hydra Stream's current broker implementation.
+## 2. Docker Compose Specification (`deploy/docker-compose.yml`)
 
 ```yaml
-services:
-  broker-a:
-    image: hydra-broker:dev
-    container_name: hydra-sim-broker-a
-    volumes:
-      - broker_a_data:/var/lib/hydra
-    networks: [hydra-sim]
-
-  broker-b:
-    image: hydra-broker:dev
-    container_name: hydra-sim-broker-b
-    volumes:
-      - broker_b_data:/var/lib/hydra
-    networks: [hydra-sim]
-
-  broker-c:
-    image: hydra-broker:dev
-    container_name: hydra-sim-broker-c
-    volumes:
-      - broker_c_data:/var/lib/hydra
-    networks: [hydra-sim]
+version: '3.8'
 
 networks:
-  hydra-sim:
-    internal: false
+  hydra-mesh:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
 
-volumes:
-  broker_a_data:
-  broker_b_data:
-  broker_c_data:
+services:
+  # Dynamic Service Registry
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.12
+    container_name: hydra-etcd
+    command:
+      - /usr/local/bin/etcd
+      - --advertise-client-urls=http://etcd:2379
+      - --listen-client-urls=http://0.0.0.0:2379
+    ports:
+      - "2379:2379"
+    networks:
+      - hydra-mesh
+
+  # Link Latency & Broker Health Observability
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: hydra-prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - hydra-mesh
+
+  # Region 1: India Broker Node
+  broker-india:
+    build:
+      context: ../Hydrosync
+      dockerfile: Dockerfile
+    container_name: hydra-broker-india
+    environment:
+      - BROKER_ID=broker-india-1
+      - REGION=India
+      - PORT=9092
+      - HEALTH_PORT=8081
+      - ETCD_ENDPOINTS=http://etcd:2379
+    ports:
+      - "9092:9092"
+      - "8081:8081"
+    depends_on:
+      - etcd
+    networks:
+      - hydra-mesh
+
+  # Region 2: Germany Broker Node (EU Legal Jurisdiction)
+  broker-germany:
+    build:
+      context: ../Hydrosync
+      dockerfile: Dockerfile
+    container_name: hydra-broker-germany
+    environment:
+      - BROKER_ID=broker-germany-1
+      - REGION=Germany
+      - PORT=9093
+      - HEALTH_PORT=8082
+      - ETCD_ENDPOINTS=http://etcd:2379
+    ports:
+      - "9093:9093"
+      - "8082:8082"
+    depends_on:
+      - etcd
+    networks:
+      - hydra-mesh
+
+  # Region 3: Singapore Broker Node
+  broker-singapore:
+    build:
+      context: ../Hydrosync
+      dockerfile: Dockerfile
+    container_name: hydra-broker-singapore
+    environment:
+      - BROKER_ID=broker-singapore-1
+      - REGION=Singapore
+      - PORT=9094
+      - HEALTH_PORT=8083
+      - ETCD_ENDPOINTS=http://etcd:2379
+    ports:
+      - "9094:9094"
+      - "8083:8083"
+    depends_on:
+      - etcd
+    networks:
+      - hydra-mesh
 ```
 
-This is a topology sketch, not a directly runnable Compose file. It intentionally omits unknown Hydra image commands, ports and health checks.
+---
 
-## 6. Readiness checks
+## 3. Dynamic Registration Verification
 
-Distinguish:
-- Container created.
-- Container running.
-- Broker process alive.
-- Broker protocol responds.
-- Broker is registered/ready for the scenario.
-
-Only the strongest available broker-level check should satisfy scenario readiness.
-
-## 7. Local developer workflow
-
-Proposed commands:
-
-```bash
-# Build broker image
-docker build -t hydra-broker:dev -f deploy/docker/Dockerfile .
-
-# Start the simulator cluster
-docker compose -p hydra-sim -f deploy/compose/docker-compose.yml up -d
-
-# Inspect service state
-docker compose -p hydra-sim -f deploy/compose/docker-compose.yml ps
-
-# Stop the test cluster
-docker compose -p hydra-sim -f deploy/compose/docker-compose.yml down
-```
-
-The final commands must use the actual repository paths and Dockerfile after implementation.
-
-## 8. Safety
-
-Never point destructive simulator commands at a developer's unrelated Docker Compose project. Require an explicit project identity and verify labels before stopping, restarting, resetting or deleting resources.
+When the containers start:
+1. Each broker connects to `http://etcd:2379`.
+2. Registers key `/registry/brokers/<broker-id>` with a 5-second TTL.
+3. The Hydra Control Plane watches `/registry/brokers/` and dynamically discovers all nodes and their regions **with zero hardcoded IP addresses**.

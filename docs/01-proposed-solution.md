@@ -1,82 +1,83 @@
 # 01 — Proposed Solution
 
-## 1. Summary
+## 1. Solution Architecture & Component Stack
 
-Implement a **Hybrid Simulation Engine** with two concurrent capabilities:
+Hydra Stream adopts a modern distributed systems architecture that separates control logic, service discovery, traffic steering, and message execution.
 
-- **Workload simulation:** producers, consumers, message sizes, rates, traffic patterns and processing delays.
-- **Fault simulation:** broker stop/restart first, followed by network and resource faults.
+Instead of writing a bloated monolith, Hydra Stream builds a **specialized Hydra Control Plane in Go** that coordinates battle-tested cloud-native components:
 
-A Go controller owns experiment orchestration. A C++ workload executable generates traffic. Fault adapters control the disposable test cluster. An observation pipeline records events and metrics. A correctness oracle evaluates assertions after and during the experiment.
-
-## 2. MVP scope
-
-### Included
-
-- Three-broker Docker Compose environment.
-- YAML experiment configuration.
-- Configuration validation.
-- C++ producer/consumer workload executable.
-- Unique message identities.
-- Fixed-seed random workload inputs.
-- Constant-rate workload initially; burst and ramp patterns next.
-- Go experiment lifecycle and scheduler.
-- Broker stop/restart fault.
-- Client and broker health observations.
-- Latency and throughput measurements.
-- JSONL event stream and JSON report.
-- Correctness assertions that match implemented broker guarantees.
-
-### Deferred
-
-- `tc netem` latency, jitter and packet loss.
-- Network partition and one-way link isolation.
-- Disk-full and slow-storage experiments.
-- Replication lag and follower catch-up assertions until replication exists.
-- Safe automatic leader failover assertions until a sound election/consensus design exists.
-- Dashboard and historical comparison UI.
-- Kubernetes CronJobs or recurring scheduling.
-
-## 3. Component responsibilities
-
-| Component | Language | Responsibility |
+| Layer / Component | Technology Choice | Core Responsibility |
 |---|---|---|
-| Experiment controller | Go | Parse config, validate, orchestrate lifecycle and schedule events |
-| Workload engine | C++ | Generate producer/consumer traffic and client-side observations |
-| Fault injector | Go | Apply and recover controlled faults |
-| Cluster adapter | Go | Inspect and control the disposable Docker Compose environment |
-| Observation collector | Go initially | Receive, validate and persist events and metric samples |
-| Correctness oracle | Go initially | Evaluate message, offset and lifecycle assertions |
-| Report generator | Go | Produce JSON and Markdown summaries |
+| **Broker Engine (Data Plane)** | **Hydra C++ Broker** | High-throughput in-memory bounded queues, thread-pool execution, sequential offset tracking. |
+| **Discovery & Registry** | **etcd** | Dynamic broker registration with TTL heartbeats. Zero hardcoded IPs. |
+| **Routing & Policy Engine** | **Hydra Control Plane (Go)** | Enforces legal data residency, calculates link quality scores, and steers routes. |
+| **Link Observability** | **Prometheus** | Continuously measures cross-region RTT, error rates, and broker health. |
+| **Traffic Proxy & Steering** | **Envoy (L4 Proxy)** | Dynamic connection forwarding and outlier ejection based on Control Plane instructions. |
+| **Chaos & Verification Subsystem** | **Hydra Simulation Engine** | Injects cross-region slow links, stops regional brokers, and reconciles the correctness ledger. |
 
-The oracle and collector may begin in the same Go module, but should remain separate packages with explicit interfaces.
+---
 
-## 4. Execution model
+## 2. Dynamic Discovery Without Hardcoding
 
-The controller starts the cluster and observation pipeline, launches the workload process, then schedules fault actions against an experiment-relative monotonic clock.
-
-The workload continues through a fault unless the scenario explicitly defines a stop condition. The controller must not assume the cluster can continue accepting writes after a broker is stopped.
-
-## 5. What constitutes a successful run?
-
-A run is not simply `exit code 0`.
-
-A run has at least three independent outcomes:
-
-- **Execution status:** did the experiment complete its planned lifecycle?
-- **Correctness status:** did enabled assertions pass?
-- **Performance status:** were measured values within configured thresholds, if thresholds were specified?
-
-A run can complete successfully while a correctness assertion fails. Reports must preserve that distinction.
-
-## 6. Suggested CLI
-
-```text
-hydra-sim validate --config scenarios/broker-crash-recovery.yaml
-hydra-sim run      --config scenarios/broker-crash-recovery.yaml
-hydra-sim report   --run-id <run-id>
-hydra-sim list
-hydra-sim cleanup  --run-id <run-id>
+```
++---------------------------------------------------------------------------------------+
+|                                HYDRA CONTROL PLANE (Go)                               |
+|   - Continuously watches /registry/brokers/* in etcd                                  |
+|   - Reads RTT & health metrics from Prometheus                                        |
+|   - Computes dynamic route weights and residency rules                                |
++---------------------------------------------------------------------------------------+
+        ^                                       ^                                   ^
+        | (Watch Nodes)                         | (Scrape Metrics)                  | (Push Routes)
+        v                                       v                                   v
++------------------+                   +------------------+                +------------------+
+|   ETCD REGISTRY  |                   |    PROMETHEUS    |                |    ENVOY PROXY   |
+| (Dynamic Leases) |                   | (Latency & Loss) |                | (Dynamic Routes) |
++------------------+                   +------------------+                +------------------+
 ```
 
-`cleanup` must verify that the target belongs to the simulator's disposable environment before removing containers or networks.
+1. **Broker Registration on Boot**:
+   Every broker container announces itself on boot to `etcd` with a TTL heartbeat:
+   ```json
+   {
+     "broker_id": "hydra-broker-de-1",
+     "region": "Germany",
+     "endpoint": "10.0.2.10:9092",
+     "status": "UP"
+   }
+   ```
+2. **Automatic Deregistration**:
+   If a broker crashes or its network is severed, its `etcd` TTL lease expires within 5 seconds, notifying the Control Plane automatically.
+
+---
+
+## 3. How the 3 Core Capabilities Are Implemented
+
+### 1. Legal Data Residency
+* A topic is created with a region constraint: `residency: "Germany"`.
+* When a producer requests metadata for this topic, the Hydra Control Plane **filters out all endpoints located outside Germany**.
+* If a producer attempts to bypass metadata and directly connect to a broker in India or Singapore, the broker's admission layer rejects the request with `RESIDENCY_VIOLATION`.
+
+### 2. Routing Around Slow Links
+* Prometheus scrapes link latencies between regional endpoints.
+* The Hydra Control Plane assigns dynamic scores to available paths:
+  $$\text{Score} = \frac{1}{\text{RTT (ms)} \times (1 + \text{PacketDropRate})}$$
+* When an inter-region link degrades (e.g. latency exceeds 250ms), the Control Plane updates Envoy's dynamic routing table, shifting traffic away from the slow link to an optimal regional path or buffering at local ingress.
+
+### 3. Surviving Regional Outages Without Freezing
+* The cluster avoids rigid global quorums.
+* Each regional broker maintains autonomous in-memory partition buffers.
+* If a region (e.g. Singapore) is disconnected, the surviving regions (India, Germany) continue operating locally without deadlocking.
+
+---
+
+## 4. MVP Scope Definition
+
+### Included in MVP
+- **3 Regional Brokers**: `India` (Port 9092), `Germany` (Port 9093), `Singapore` (Port 9094) deployed in Docker.
+- **Dynamic Service Registry**: `etcd` container for dynamic registration.
+- **Hydra Control Plane (Go)**: Validates region policies and discovers active nodes.
+- **Producer / Consumer Client**: Connects via network socket to publish and fetch messages by sequential offset.
+- **Simulation Faults**:
+  - Stopping a regional broker (Crash test).
+  - Injecting simulated latency into a regional link (Slow-link test).
+- **Correctness Oracle**: Mathematically verifies that 0 acknowledged messages are lost and 0 Germany messages touch India/Singapore.

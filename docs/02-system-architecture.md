@@ -1,114 +1,106 @@
 # 02 — System Architecture
 
-## 1. Logical architecture
+## 1. Multi-Region System Topology
+
+The Hydra Stream architecture spans three logical geographic regions, coordinated by the **Hydra Control Plane** and backed by **`etcd`** and **Prometheus**.
 
 ```mermaid
 flowchart TB
-    YAML[Scenario YAML] --> CTRL[Go Experiment Controller]
-    CTRL --> VALIDATE[Config Validator]
-    CTRL --> CLUSTER[Cluster Adapter]
-    CTRL --> SCHED[Experiment Scheduler]
-    CTRL --> WORKLOAD[C++ Workload Process]
-    CTRL --> FAULT[Go Fault Injector]
+    subgraph CP["Hydra Control Plane & Infrastructure"]
+        ETCD[("etcd (Registry)")]
+        PROM[("Prometheus (Link Metrics)")]
+        CTRL["Hydra Control Plane (Go)"]
+        
+        CTRL <-->|Watch Leases| ETCD
+        CTRL <-->|Scrape RTT| PROM
+    end
 
-    WORKLOAD -->|Hydra client protocol| B1[Broker A]
-    WORKLOAD -->|Hydra client protocol| B2[Broker B]
-    WORKLOAD -->|Hydra client protocol| B3[Broker C]
+    subgraph R1["Region: India"]
+        BR_IN["Hydra Broker (India)\n- In-Memory Partitions\n- Port 9092\n- Health 8081"]
+    end
 
-    FAULT -->|Docker control| B1
-    FAULT -->|Docker control| B2
-    FAULT -->|Docker control| B3
+    subgraph R2["Region: Germany (EU Legal)"]
+        BR_DE["Hydra Broker (Germany)\n- In-Memory Partitions\n- Port 9093\n- Health 8082"]
+    end
 
-    B1 --> OBS[Observation Collector]
-    B2 --> OBS
-    B3 --> OBS
-    WORKLOAD -->|JSONL events / metrics| OBS
-    FAULT -->|Fault events| OBS
+    subgraph R3["Region: Singapore"]
+        BR_SG["Hydra Broker (Singapore)\n- In-Memory Partitions\n- Port 9094\n- Health 8083"]
+    end
 
-    OBS --> LEDGER[Message / Offset Ledger]
-    OBS --> METRICS[Metrics Aggregator]
-    LEDGER --> ORACLE[Correctness Oracle]
-    METRICS --> REPORT[Report Generator]
-    ORACLE --> REPORT
-    REPORT --> RESULTS[(Run Artifacts)]
+    BR_IN -->|Register Heartbeat| ETCD
+    BR_DE -->|Register Heartbeat| ETCD
+    BR_SG -->|Register Heartbeat| ETCD
+
+    PROM -.->|Probe Latency| BR_IN
+    PROM -.->|Probe Latency| BR_DE
+    PROM -.->|Probe Latency| BR_SG
+
+    subgraph CLIENTS["Workload Ingress (Producers & Consumers)"]
+        PROD["Producers"]
+        CONS["Consumers"]
+    end
+
+    PROD -->|Query Route & Policy| CTRL
+    PROD -->|TCP Traffic| BR_IN
+    PROD -->|TCP Traffic| BR_DE
+    PROD -->|TCP Traffic| BR_SG
+    CONS -->|Fetch Messages| BR_IN
+    CONS -->|Fetch Messages| BR_DE
+    CONS -->|Fetch Messages| BR_SG
 ```
 
-## 2. Architectural boundaries
+---
 
-### Control plane of the simulator
+## 2. Process Boundaries & Subsystems
 
-The Go controller coordinates experiments, process lifecycle, schedules and result collection. It is not part of Hydra Stream's message data path.
+### 2.1 The Hydra Control Plane (Go)
+* **Language**: Go
+* **Responsibilities**:
+  1. **Node Watcher**: Listens to `etcd` key changes under `/registry/brokers/`.
+  2. **Policy Validator**: Compares topic metadata against broker region metadata. Enforces that `legal_region: Germany` can only be routed to German broker endpoints.
+  3. **Route Optimizer**: Evaluates Prometheus latency data. When an inter-region link degrades past a configurable threshold ($\text{RTT} > 200\text{ms}$ or error rate $> 2\%$), marks the route as `DEGRADED` and dynamically recalculates partition ingress weights.
+  4. **Health Supervisor**: Monitors broker health endpoints and manages failover during regional disconnects.
 
-### Workload data path
+### 2.2 The Hydra Broker Daemon (C++)
+* **Language**: C++17
+* **Responsibilities**:
+  1. **Ingress TCP/HTTP Listener**: Listens on a dedicated port for `PRODUCE` and `FETCH` commands.
+  2. **Bounded Queue Engine**: Holds messages in thread-safe, bounded in-memory queues (`ConcurrentQueue<Message>`). Protects RAM from OOM crashes via dual condition-variable backpressure.
+  3. **Sequential Offset Manager**: Assigns monotonic sequential offsets (`0, 1, 2...`) to arriving messages.
+  4. **Thread Pool Executor**: Offloads consumer task dispatching to worker threads via `std::packaged_task` and `std::future`.
+  5. **Actor-Pattern Logger**: Lock-free background thread logging.
+  6. **Self-Registration Agent**: Publishes heartbeat leases to `etcd` on startup.
 
-The C++ workload executable uses Hydra Stream's actual client protocol or supported client library. It must not bypass the broker by writing directly to broker storage.
+---
 
-### Fault control path
+## 3. Communication Protocols & Interfaces
 
-The fault injector controls only resources explicitly tagged as belonging to the simulator. It records an event before and after each fault action.
-
-### Observation path
-
-Events and measurements are sent to a collector. Observability failure must be reported; the simulator must not silently treat missing observations as success.
-
-## 3. Process model
-
-Initial deployment:
-
-- One controller process.
-- One workload process per experiment (internally multi-threaded).
-- One fault-injector capability inside the controller process or a separately supervised process.
-- Three independent broker processes/containers.
-- One observation collector, initially embedded in the controller or run as a local service.
-
-Avoid creating a microservice for every package. Keep deployment simple while preserving code-level interfaces.
-
-## 4. Proposed interfaces
-
-### Cluster adapter
-
-```go
-type Cluster interface {
-    Validate(ctx context.Context) error
-    Start(ctx context.Context) error
-    WaitHealthy(ctx context.Context) error
-    StopBroker(ctx context.Context, brokerID string) error
-    StartBroker(ctx context.Context, brokerID string) error
-    BrokerStatus(ctx context.Context, brokerID string) (BrokerStatus, error)
-    Cleanup(ctx context.Context) error
+### 3.1 Broker Registration Interface (etcd JSON Schema)
+```json
+{
+  "broker_id": "broker-india-1",
+  "region": "India",
+  "host": "hydra-broker-india",
+  "port": 9092,
+  "health_port": 8081,
+  "started_at": 1730376000,
+  "status": "UP"
 }
 ```
 
-The exact interface may change after inspecting the current Docker setup.
+### 3.2 Client–Broker Wire Protocol (TCP Frame)
+Every network frame exchanged between clients and the broker follows a lean binary header:
 
-### Workload process
+```
++------------+------------+---------------+------------------+--------------------+---------------------+
+| Magic Byte | Version    | OpCode        | Correlation ID   | Payload Length     | Payload Data        |
+| 0x48 ('H') | 0x01 (1 B) | 2 Bytes (u16) | 8 Bytes (u64)    | 4 Bytes (u32)      | N Bytes             |
++------------+------------+---------------+------------------+--------------------+---------------------+
+```
 
-The controller launches a versioned executable with a generated runtime configuration and run identifier. The process emits structured events and a final summary.
-
-### Event envelope
-
-Every event should include:
-
-- `schema_version`
-- `run_id`
-- `event_id`
-- `source`
-- `event_type`
-- `wall_time`
-- `elapsed_ns`
-- `attributes`
-
-Use wall-clock time for human correlation and monotonic elapsed time for experiment ordering and durations.
-
-## 5. Failure containment
-
-- Every run has a unique ID and resource labels.
-- The controller owns child-process handles.
-- On cancellation, stop scheduling new faults and request workload shutdown.
-- Attempt fault recovery for any applied fault.
-- Persist partial results even if cleanup fails.
-- Never clean up resources that cannot be positively identified as simulator-owned.
-
-## 6. Future evolution
-
-The initial collector can use JSONL files. If event volume or remote execution later requires it, replace the transport behind an interface without changing experiment semantics.
+* **OpCodes**:
+  * `0x0001` : `PRODUCE_REQ`
+  * `0x0002` : `PRODUCE_ACK` (returns assigned monotonic offset)
+  * `0x0003` : `FETCH_REQ` (requests messages starting at offset)
+  * `0x0004` : `FETCH_RES`
+  * `0x0005` : `HEALTH_PING`

@@ -1,89 +1,48 @@
-# 08 — Correctness Oracle
+# 08 — Correctness Oracle & Verification Engine
 
-## 1. Purpose
+## 1. What is the Correctness Oracle?
 
-The correctness oracle evaluates what the broker did against the experiment's delivery contract. It must distinguish confirmed facts from ambiguous outcomes.
+The **Correctness Oracle** is a self-contained, in-memory algorithmic verifier written in Go.  
+It has **zero third-party or paid dependencies**. It runs entirely locally by inspecting the in-memory event stream (`events.jsonl`) generated during the simulation run.
 
-## 2. Message lifecycle
+The Oracle determines whether the system maintained its guarantees under chaos and failure.
+
+---
+
+## 2. The 4 Fundamental Invariants Evaluated
 
 ```mermaid
 flowchart TD
-    A[Producer creates unique message ID] --> B[Send attempt]
-    B --> C{Broker response}
-    C -->|Success acknowledgement| D[Add to acknowledged ledger]
-    C -->|Timeout / connection loss| E[Mark outcome unknown]
-    C -->|Definite rejection| F[Record rejected]
-    D --> G[Consumer delivery observation]
-    E --> G
-    G --> H[Processing result]
-    H --> I[Offset commit observation]
-    D --> J[Final reconciliation]
-    E --> J
-    G --> J
-    I --> J
-    J --> K[Assertion results]
+    EV["events.jsonl\n(Event Stream)"] --> ORACLE["In-Memory Correctness Oracle"]
+    
+    ORACLE --> I1["Invariant 1: Legal Residency Compliance\n(Did ANY German data touch India/Singapore?)"]
+    ORACLE --> I2["Invariant 2: Slow-Link Adaptive Steering\n(Did ingress bypass the degraded path?)"]
+    ORACLE --> I3["Invariant 3: No Cluster Freeze on Regional Outage\n(Did surviving regions continue operating?)"]
+    ORACLE --> I4["Invariant 4: Zero Acknowledged Message Loss\n(Were all ACK'd messages delivered?)"]
+
+    I1 --> OUTCOME{"All Invariants Passed?"}
+    I2 --> OUTCOME
+    I3 --> OUTCOME
+    I4 --> OUTCOME
+
+    OUTCOME -->|Yes| PASS["Status: PASSED"]
+    OUTCOME -->|Violation| FAIL["Status: FAILED"]
 ```
 
-## 3. Separate observations
+### Invariant 1: `legal_data_residency_respected`
+* **Rule**: For any topic tagged with a legal residency (e.g. `legal_region: Germany`), verify that:
+  $$\text{Brokers}(\text{Topic}) \subseteq \text{AllowedRegion}$$
+* If even a single byte of message payload or offset metadata is observed on a broker in India or Singapore, the Oracle flags:  
+  **`FAILED: LEGAL_RESIDENCY_VIOLATION`**.
 
-Maintain distinct records for:
+### Invariant 2: `route_bypassed_during_degradation`
+* **Rule**: During the window where the link between India and Germany was injected with 350ms latency, the Oracle verifies that client produce latency did not degrade to $\ge 350\text{ms}$ on adaptive topics, proving that the traffic was steered around the degraded link.
 
-- `attempted`: producer attempted to send the message.
-- `acknowledged`: producer received successful broker acknowledgement.
-- `unknown_outcome`: producer did not receive a definitive result.
-- `rejected`: broker definitively rejected the request.
-- `delivered`: consumer observed the message.
-- `processed`: consumer completed processing.
-- `committed`: consumer offset progress was committed.
+### Invariant 3: `no_cluster_freeze_during_regional_blackout`
+* **Rule**: When region Singapore was stopped (blackout), the Oracle checks timestamps of produce/consume operations in India and Germany. If operations in surviving regions stalled for $> 2$ seconds, it flags **`FAILED: CLUSTER_FREEZE_DETECTED`**.
 
-These sets must not be collapsed into a single sent/received counter.
-
-## 4. Message identity
-
-Use a stable key such as `(run_id, producer_id, sequence_number)`. A retry should preserve the same logical message identity if the client/broker idempotency contract supports that interpretation. If the broker treats retries as new appends, the oracle should expose duplicate records rather than hide them.
-
-## 5. Core assertions
-
-| Assertion | Meaning | Prerequisite |
-|---|---|---|
-| `partition_offsets_monotonic` | Observed offsets do not move backward within a partition | Offset observations |
-| `queue_capacity_respected` | Queue never exceeds configured capacity | Queue-depth metric or broker assertion |
-| `no_acknowledged_message_loss` | Every acknowledged message is accounted for under the declared durability boundary | Defined ack semantics and complete observation window |
-| `no_duplicate_delivery` | No logical ID is delivered more than once | Defined delivery contract; may be expected to fail under at-least-once |
-| `consumer_commits_monotonic` | Committed offsets do not move backward | Commit observations |
-| `no_dual_leader` | No two leaders accept writes for the same partition at the same epoch | Leadership/epoch observability and implemented election model |
-| `residency_policy_respected` | No placement/replication outside permitted regions | Trusted region metadata and policy audit events |
-
-## 6. Ambiguous producer outcomes
-
-A producer timeout does not prove that the broker failed to append. The request may have succeeded while the acknowledgement was lost.
-
-Therefore:
-- Do not count a timeout as a definite rejected message.
-- Preserve the message ID in `unknown_outcome`.
-- Reconcile with consumer observations and broker offsets where possible.
-- Report unresolved outcomes separately.
-
-## 7. Delivery semantics
-
-The Hydra Stream blueprint targets at-least-once delivery initially. Duplicate delivery may therefore be expected. The oracle must not mark a run incorrect merely because a message is delivered more than once unless the scenario has a stronger, implemented idempotency contract.
-
-## 8. Assertion statuses
-
-Use explicit statuses:
-
-- `PASSED`
-- `FAILED`
-- `SKIPPED_UNSUPPORTED`
-- `INCONCLUSIVE` — required observations missing or ambiguous
-- `NOT_RUN` — assertion disabled
-
-A skipped or inconclusive assertion is not a pass.
-
-## 9. Observation completeness
-
-If the workload or collector drops events, the oracle must mark dependent assertions inconclusive. It should report the reason and the affected time range.
-
-## 10. Future extension
-
-As replication, leader epochs, recovery and regional policy become available, add assertions that consume those explicit broker observations. Do not infer internal cluster state solely from Docker container status.
+### Invariant 4: `no_acknowledged_message_loss`
+* **Rule**: Every message that received a successful `PRODUCE_ACK` from a broker must either:
+  1. Be observed by a consumer during the experiment window, OR
+  2. Remain intact in the broker's in-memory partition queue.
+* Monotonic offsets must never regress backwards.

@@ -1,6 +1,6 @@
 # Hydra Stream — Comprehensive Visual Architecture & Phase Diagrams
 
-This document consolidates all architectural, networking, lifecycle, fault injection, and correctness diagrams for the Hydra Stream and Hybrid Simulation Engine platform using Mermaid.
+This document consolidates all architectural, networking, lifecycle, fault injection, and correctness diagrams for the Hydra Stream geo-distributed platform using Mermaid.
 
 ---
 
@@ -10,31 +10,30 @@ This document consolidates all architectural, networking, lifecycle, fault injec
 flowchart LR
     subgraph P1["Phase 1: Broker Daemon & Network Stack"]
         direction TB
-        P1_A["Refactor Repo Structure"] --> P1_B["TCP Socket Server & Binary Protocol"]
-        P1_B --> P1_C["In-Memory Bounded Topic Queues (RAM)"]
-        P1_C --> P1_D["HTTP/TCP Health Probe (/health)"]
+        P1_A["Refactor C++ Engine into Standalone Daemon"] --> P1_B["TCP Socket Server & Binary Framing"]
+        P1_B --> P1_C["In-Memory Bounded Queues (Backpressure)"]
+        P1_C --> P1_D["HTTP Health Probe (:8081)"]
     end
 
-    subgraph P2["Phase 2: 3-Broker Docker Cluster"]
+    subgraph P2["Phase 2: Multi-Region Docker Topology"]
         direction TB
-        P2_A["Multi-broker Docker Compose"] --> P2_B["Isolated Bridge Network"]
-        P2_B --> P2_C["Container Memory Limits & Env Config"]
-        P2_C --> P2_D["Container Healthchecks"]
+        P2_A["Deploy etcd (Dynamic Service Registry)"] --> P2_B["3 Regional Nodes (India, Germany, Singapore)"]
+        P2_B --> P2_C["Deploy Prometheus (Link Latency Monitoring)"]
+        P2_C --> P2_D["Zero Hardcoded IPs via etcd Leases"]
     end
 
-    subgraph P3["Phase 3: Hybrid Simulation Engine MVP"]
+    subgraph P3["Phase 3: Hydra Control Plane (Go)"]
         direction TB
-        P3_A["Go Experiment Controller"] --> P3_B["C++ High-Throughput Workload Engine"]
-        P3_B --> P3_C["Docker Fault Injector (Crash/Restart)"]
-        P3_C --> P3_D["Observation Collector (JSONL)"]
-        P3_D --> P3_E["In-Memory Correctness Oracle & Reconciliation"]
+        P3_A["Go Control Plane Node Watcher"] --> P3_B["Legal Data Residency Enforcer (GDPR/EU)"]
+        P3_B --> P3_C["Adaptive Route Selector (Bypass Slow Links)"]
+        P3_C --> P3_D["In-Memory Correctness Oracle (No Loss Audit)"]
     end
 
-    subgraph P4["Phase 4: Advanced Chaos & Production Readiness"]
+    subgraph P4["Phase 4: Chaos & Regional Outage Resilience"]
         direction TB
-        P4_A["Linux tc netem Faults (Latency/Loss)"] --> P4_B["Partition Isolation Rules"]
-        P4_B --> P4_C["Automated CI/CD Test Matrix"]
-        P4_C --> P4_D["Markdown & JSON Executive Reports"]
+        P4_A["Linux tc netem Slow-Link Injection"] --> P4_B["Regional Blackout Simulation (Kill Region)"]
+        P4_B --> P4_C["Non-Freezing Cluster Quorum Verification"]
+        P4_C --> P4_D["Automated JSON/Markdown Executive Reports"]
     end
 
     P1 --> P2
@@ -48,86 +47,72 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-    subgraph CONTROLLER["Simulation Control Plane (Go)"]
-        CLI["hydra-sim CLI"]
-        CFG["Scenario YAML Parser & Validator"]
-        SCHED["Monotonic Clock Scheduler"]
-        FAULTE["Fault Engine (Docker Adapter)"]
+    subgraph CP["Hydra Control Plane (Go)"]
+        DISC["Dynamic Discovery Watcher (etcd client)"]
+        POLICY["Legal Residency Policy Engine"]
+        ROUTER["Adaptive Route Optimizer"]
+        SUPERVISOR["Outage & Failover Supervisor"]
         ORACLE["In-Memory Correctness Oracle"]
-        METRICS_AGG["Metrics & Histogram Aggregator"]
         REPORT_GEN["Report Generator (JSON/Markdown)"]
 
-        CLI --> CFG
-        CFG --> SCHED
-        SCHED --> FAULTE
-        SCHED --> ORACLE
-        METRICS_AGG --> REPORT_GEN
+        DISC --> POLICY
+        POLICY --> ROUTER
+        ROUTER --> SUPERVISOR
+        SUPERVISOR --> ORACLE
         ORACLE --> REPORT_GEN
     end
 
-    subgraph WORKLOAD["Workload Generator (C++)"]
-        SCHED_C["Traffic Scheduler (Constant / Burst / Ramp)"]
-        PROD_POOL["Producer Worker Threads"]
-        CONS_POOL["Consumer Worker Threads"]
-        CLIENT_ADAPTER["Hydra Client Protocol Adapter"]
-        EVENT_SINK["Buffered JSONL Event Sink"]
-
-        SCHED_C --> PROD_POOL
-        PROD_POOL --> CLIENT_ADAPTER
-        CONS_POOL --> CLIENT_ADAPTER
-        PROD_POOL --> EVENT_SINK
-        CONS_POOL --> EVENT_SINK
+    subgraph INFRA["Cloud-Native Infrastructure"]
+        ETCD[("etcd (Registry & Leases)")]
+        PROM[("Prometheus (Link RTT & Loss)")]
+        ENVOY["Envoy L4 Proxy (Traffic Steering)"]
     end
 
-    subgraph CLUSTER["Hydra Stream Distributed Cluster (Docker)"]
+    subgraph CLUSTER["Regional Broker Cluster (Docker)"]
         direction LR
-        subgraph BA["Broker A (Leader/Replica)"]
-            NET_A["TCP Listener :9092"]
-            ENG_A["Broker Engine"]
-            RAM_A["In-Memory ConcurrentQueue"]
-            HEALTH_A["Health Probe :8081"]
-            NET_A --> ENG_A --> RAM_A
-            ENG_A --> HEALTH_A
+        subgraph IN["Region: India"]
+            NET_IN["TCP Listener :9092"]
+            ENG_IN["Broker Engine"]
+            RAM_IN["In-Memory Queue"]
+            HEALTH_IN["Health Probe :8081"]
+            NET_IN --> ENG_IN --> RAM_IN
+            ENG_IN --> HEALTH_IN
         end
 
-        subgraph BB["Broker B (Follower/Replica)"]
-            NET_B["TCP Listener :9093"]
-            ENG_B["Broker Engine"]
-            RAM_B["In-Memory ConcurrentQueue"]
-            HEALTH_B["Health Probe :8082"]
-            NET_B --> ENG_B --> RAM_B
-            ENG_B --> HEALTH_B
+        subgraph DE["Region: Germany (EU Legal)"]
+            NET_DE["TCP Listener :9093"]
+            ENG_DE["Broker Engine"]
+            RAM_DE["In-Memory Queue"]
+            HEALTH_DE["Health Probe :8082"]
+            NET_DE --> ENG_DE --> RAM_DE
+            ENG_DE --> HEALTH_DE
         end
 
-        subgraph BC["Broker C (Follower/Replica)"]
-            NET_C["TCP Listener :9094"]
-            ENG_C["Broker Engine"]
-            RAM_C["In-Memory ConcurrentQueue"]
-            HEALTH_C["Health Probe :8083"]
-            NET_C --> ENG_C --> RAM_C
-            ENG_C --> HEALTH_C
+        subgraph SG["Region: Singapore"]
+            NET_SG["TCP Listener :9094"]
+            ENG_SG["Broker Engine"]
+            RAM_SG["In-Memory Queue"]
+            HEALTH_SG["Health Probe :8083"]
+            NET_SG --> ENG_SG --> RAM_SG
+            ENG_SG --> HEALTH_SG
         end
     end
 
-    subgraph OBSERVATIONS["Observation & Storage Subsystem"]
-        EVENT_LOG["events.jsonl"]
-        LEDGER["In-Memory Ledger (Attempted/Acked/Delivered)"]
-        REPORT_FILE["report.json / report.md"]
-    end
+    CP -->|Watch Leases| ETCD
+    CP -->|Scrape RTT| PROM
+    CP -->|Update Routes| ENVOY
 
-    CLIENT_ADAPTER -->|TCP Binary Framing| NET_A
-    CLIENT_ADAPTER -->|TCP Binary Framing| NET_B
-    CLIENT_ADAPTER -->|TCP Binary Framing| NET_C
+    ENG_IN -->|Register Heartbeat| ETCD
+    ENG_DE -->|Register Heartbeat| ETCD
+    ENG_SG -->|Register Heartbeat| ETCD
 
-    FAULTE -->|Docker Engine API| BA
-    FAULTE -->|Docker Engine API| BB
-    FAULTE -->|Docker Engine API| BC
+    PROM -.->|Scrape| HEALTH_IN
+    PROM -.->|Scrape| HEALTH_DE
+    PROM -.->|Scrape| HEALTH_SG
 
-    EVENT_SINK --> EVENT_LOG
-    EVENT_LOG --> LEDGER
-    LEDGER --> ORACLE
-    EVENT_LOG --> METRICS_AGG
-    REPORT_GEN --> REPORT_FILE
+    ENVOY -->|Forward Traffic| NET_IN
+    ENVOY -->|Forward Traffic| NET_DE
+    ENVOY -->|Forward Traffic| NET_SG
 ```
 
 ---
@@ -156,355 +141,189 @@ flowchart LR
 ```mermaid
 sequenceDiagram
     autonumber
-    participant C as C++ Workload Client
-    participant S as Broker TCP Socket Listener
-    participant W as Worker Thread Pool
-    participant T as Topic In-Memory Queue
+    participant C as Producer / Consumer Client
+    participant E as Envoy / Router
+    participant B as Regional Broker (Germany)
+    participant Q as In-Memory ConcurrentQueue
 
-    Note over C,S: Connection Establishment (TCP 3-way handshake)
-    C->>S: Connect(IP, Port)
-    S-->>C: Connection Accepted
+    Note over C,E: 1. Routing & Residency Check
+    C->>E: Produce(Topic="eu-medical", Payload=Bytes)
+    E->>E: Validate Residency: Target MUST be Germany
+    E->>B: Forward Frame[CMD=PRODUCE, CorrID=101, Topic='eu-medical']
 
-    rect rgb(240, 248, 255)
-        Note over C,T: Produce Message Flow
-        C->>S: Frame[CMD=PRODUCE, CorrID=101, Topic='orders', Payload=Bytes]
-        S->>W: Dispatch Request Task
-        W->>T: Append to In-Memory ConcurrentQueue
-        T-->>W: Committed Offset: 4502
-        W->>S: Response Frame[CMD=PRODUCE_ACK, CorrID=101, Offset=4502]
-        S-->>C: Deliver ACK Frame
-        C->>C: Record Produce Latency & Emit JSONL Event
-    end
+    Note over B,Q: 2. In-Memory Ingress & Monotonic Offset
+    B->>Q: Append to Bounded Queue (Backpressure protected)
+    Q-->>B: Assigned Monotonic Offset: 5041
+    B-->>E: Frame[CMD=PRODUCE_ACK, CorrID=101, Offset=5041]
+    E-->>C: Deliver ACK Frame
 
-    rect rgb(255, 250, 240)
-        Note over C,T: Consume Message Flow
-        C->>S: Frame[CMD=FETCH, CorrID=102, Topic='orders', Offset=4502, MaxBytes=65536]
-        S->>W: Fetch Task
-        W->>T: Read from In-Memory Offset 4502
-        T-->>W: Message Batch [ID=101, Offset=4502]
-        W->>S: Response Frame[CMD=FETCH_RES, CorrID=102, Messages]
-        S-->>C: Deliver Messages
-        C->>C: Record Delivery Latency & Emit JSONL Event
-    end
+    Note over C,Q: 3. Fetch by Sequential Offset
+    C->>E: Fetch(Topic="eu-medical", Offset=5041)
+    E->>B: Forward Frame[CMD=FETCH, Offset=5041]
+    B->>Q: Read from Offset 5041
+    Q-->>B: Message Data
+    B-->>E: Frame[CMD=FETCH_RES, Offset=5041, Payload=Bytes]
+    E-->>C: Deliver Message Batch
 ```
 
 ---
 
-## 4. Broker Internal Multi-Threading & In-Memory Storage
+## 4. Three-Region Cluster Deployment with etcd (Docker Compose)
 
 ```mermaid
 flowchart TB
-    subgraph INGRESS["Network Ingress & Dispatch"]
-        CONN["Incoming Client TCP Connections"] --> ACC["Acceptor Loop"]
-        ACC --> WORKER_Q["Network Read/Write Queue"]
-        WORKER_Q --> PARSER["Protocol Decoder & Framing Parser"]
-    end
-
-    subgraph ENGINE["Broker Core Engine"]
-        PARSER --> ROUTER["Command Router"]
-        ROUTER -->|Produce| TOPIC_MGR["Topic Manager"]
-        ROUTER -->|Fetch| TOPIC_MGR
-        ROUTER -->|Health| HEALTH_MOD["Health Provider (/health)"]
-
-        subgraph TOPIC_PART["Topic: 'orders' (Pure In-Memory)"]
-            PART0["Partition 0 (Bounded ConcurrentQueue in RAM)"]
-            PART1["Partition 1 (Bounded ConcurrentQueue in RAM)"]
+    subgraph DOCKER_HOST["Docker Host Environment (hydra-mesh: 172.30.0.0/16)"]
+        subgraph COORD["Coordination & Observability"]
+            ETCD["etcd:2379\n(Dynamic Registry & Node Leases)"]
+            PROM["Prometheus:9090\n(Inter-Region Latency & Health)"]
         end
 
-        TOPIC_MGR --> PART0
-        TOPIC_MGR --> PART1
-    end
-
-    subgraph POOL["Asynchronous Execution"]
-        TH_POOL["Worker Thread Pool"]
-        ROUTER --> TH_POOL
-        TH_POOL --> SINK_LOG["Thread-Safe Logger (Actor Pattern)"]
-    end
-```
-
----
-
-## 5. Three-Broker Cluster Deployment (Docker Compose)
-
-```mermaid
-flowchart TB
-    subgraph DOCKER_HOST["Docker Host Environment"]
-        subgraph BRIDGE["Isolated Network: hydra-cluster-net (172.28.0.0/16)"]
-            subgraph B1["Container: hydra-broker-a"]
-                SRV1["Hydra Daemon (broker_id=broker-a)"]
-                P1_TCP["TCP Port :9092"]
-                P1_HTTP["HTTP Health :8081"]
-            end
-
-            subgraph B2["Container: hydra-broker-b"]
-                SRV2["Hydra Daemon (broker_id=broker-b)"]
-                P2_TCP["TCP Port :9093"]
-                P2_HTTP["HTTP Health :8082"]
-            end
-
-            subgraph B3["Container: hydra-broker-c"]
-                SRV3["Hydra Daemon (broker_id=broker-c)"]
-                P3_TCP["TCP Port :9094"]
-                P3_HTTP["HTTP Health :8083"]
-            end
+        subgraph R_IN["Region: India"]
+            B1["Container: hydra-broker-india\nPort: 9092 | Health: 8081\nTag: Region=India"]
         end
+
+        subgraph R_DE["Region: Germany (EU Legal Territory)"]
+            B2["Container: hydra-broker-germany\nPort: 9093 | Health: 8082\nTag: Region=Germany (GDPR)"]
+        end
+
+        subgraph R_SG["Region: Singapore"]
+            B3["Container: hydra-broker-singapore\nPort: 9094 | Health: 8083\nTag: Region=Singapore"]
+        end
+
+        B1 -->|TTL Lease Heartbeat| ETCD
+        B2 -->|TTL Lease Heartbeat| ETCD
+        B3 -->|TTL Lease Heartbeat| ETCD
+
+        PROM -.->|Scrapes| B1
+        PROM -.->|Scrapes| B2
+        PROM -.->|Scrapes| B3
     end
 
-    subgraph HOST_CLIENTS["External Host / Simulator Access"]
-        SIM_RUNNER["Go Simulation Controller & C++ Workload Engine"]
-        SIM_RUNNER -->|Connect 127.0.0.1:9092| P1_TCP
-        SIM_RUNNER -->|Connect 127.0.0.1:9093| P2_TCP
-        SIM_RUNNER -->|Connect 127.0.0.1:9094| P3_TCP
-    end
-```
-
----
-
-## 6. Workload Engine Concurrency & Flow
-
-```mermaid
-flowchart LR
-    subgraph GENERATOR["Message Generator"]
-        CFG["Workload Config\n- Seed\n- Target Rate\n- Message Size"] --> ID_GEN["Monotonic ID Generator\n(run_id, producer_id, seq_no)"]
-        ID_GEN --> RATELIMIT["Token Bucket Rate Limiter"]
-    end
-
-    subgraph PRODUCERS["Producer Worker Threads"]
-        RATELIMIT --> PT1["Producer Thread 1"]
-        RATELIMIT --> PT2["Producer Thread 2"]
-        RATELIMIT --> PTN["Producer Thread N"]
-    end
-
-    subgraph CLIENT["Client Adapter"]
-        PT1 --> SOC_POOL["Socket Connection Pool"]
-        PT2 --> SOC_POOL
-        PTN --> SOC_POOL
-        SOC_POOL --> BROKERS["Hydra Brokers (A, B, C)"]
-    end
-
-    subgraph CONSUMERS["Consumer Worker Threads"]
-        BROKERS --> CT1["Consumer Thread 1"]
-        BROKERS --> CT2["Consumer Thread 2"]
-        BROKERS --> CTN["Consumer Thread N"]
-    end
-
-    subgraph OBSERVATION["Event Sink"]
-        PT1 -->|produce.attempted\nproduce.acknowledged| Q_EV["Thread-Safe Queue"]
-        CT1 -->|consumer.delivered\nconsumer.processed| Q_EV
-        Q_EV --> FLUSHER["Background JSONL File Flusher"]
-        FLUSHER --> JSONL_FILE[("events.jsonl")]
+    subgraph CLIENTS["External Ingress Clients"]
+        CLI["Hydra Control Plane & Workload Client"]
+        CLI -->|Query Topology| ETCD
+        CLI -->|Query RTT Metrics| PROM
+        CLI -->|Produce/Fetch| B1
+        CLI -->|Produce/Fetch| B2
+        CLI -->|Produce/Fetch| B3
     end
 ```
 
 ---
 
-## 7. Experiment Lifecycle State Machine
-
-```mermaid
-stateDiagram-v2
-    [*] --> CREATED: Allocate Run ID & Directories
-    CREATED --> VALIDATING: Parse Scenario YAML
-    VALIDATING --> REJECTED: Schema / Target Validation Failed
-    VALIDATING --> PREPARING: Configuration Valid
-
-    PREPARING --> FAILED: Container / Network Setup Failed
-    PREPARING --> RUNNING: Brokers Ready & Collector Online
-
-    state RUNNING {
-        [*] --> WorkloadActive
-        WorkloadActive --> FaultTriggered: Monotonic Deadline Reached
-        FaultTriggered --> FaultInjected: Apply Docker Fault (Stop Broker)
-        FaultInjected --> WorkloadActive: Workload Continues Under Failure
-    }
-
-    RUNNING --> RECOVERING: Recovery Action Scheduled (Restart Broker)
-    RECOVERING --> RUNNING: Broker Health Restored (/health OK)
-    RECOVERING --> FINALIZING: Recovery Timeout / Cancel Signal
-
-    RUNNING --> FINALIZING: Scenario Duration Reached / Stop Command
-    FINALIZING --> COMPLETED: Observations Flushed, Oracle Evaluated, Report Generated
-    FINALIZING --> FAILED: Cleanup / Assertion Processing Error
-
-    REJECTED --> [*]
-    COMPLETED --> [*]
-    FAILED --> [*]
-```
-
----
-
-## 8. Fault Injection & Chaos Recovery Sequence
+## 5. Dynamic Slow-Link Routing & Regional Outage Sequence
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant C as Go Controller
-    participant S as Monotonic Scheduler
-    participant F as Fault Adapter (Docker Engine API)
-    participant B as Broker B Container
-    participant W as C++ Workload Engine
-    participant O as Observation Collector
+    participant C as Hydra Control Plane (Go)
+    participant P as Prometheus Latency Scraper
+    participant F as Chaos Fault Injector (tc netem)
+    participant W as Producer Client
+    participant IN as Broker India
+    participant DE as Broker Germany
 
-    Note over C,W: Experiment reaches T=60s
-    S->>C: Trigger Fault: stop-broker-b
-    C->>O: Emit Event[fault.apply.started, target=broker-b]
-    C->>F: StopContainer(name="hydra-broker-b", timeout=5s)
-    F->>B: SIGTERM / SIGKILL
-    B-->>F: Container Exited (Code 0 / 137)
-    F-->>C: Stop Confirmed
-    C->>O: Emit Event[fault.apply.completed, target=broker-b]
+    Note over C,W: Normal State: Inter-region RTT = 80ms
+    W->>IN: Send Message (Target: Global Topic)
+    IN-->>W: ACK (Latency: 80ms)
 
-    rect rgb(255, 230, 230)
-        Note over W,B: Chaos Phase: Broker B is Offline (T=60s to T=100s)
-        W->>B: Produce Request
-        W-->>W: Connection Refused / Timeout
-        W->>O: Emit Event[produce.unknown_outcome / error]
-    end
+    Note over C,W: Phase 1: Chaos Injected (India <-> Germany +350ms Latency)
+    F->>F: tc qdisc add dev eth0 root netem delay 350ms
+    P->>C: Alert: Link India-Germany RTT spiked to 430ms (DEGRADED)
+    C->>C: Recompute Route Weights: Deprecate Direct Degraded Link
 
-    Note over C,W: Experiment reaches T=100s
-    S->>C: Trigger Recovery: start-broker-b
-    C->>O: Emit Event[fault.recovery.started, target=broker-b]
-    C->>F: StartContainer(name="hydra-broker-b")
-    F->>B: Start Container Process
-    B-->>F: Process Running
-    
-    loop Healthcheck Polling
-        C->>B: GET http://localhost:8082/health
-        B-->>C: 200 OK (Status: Ready, In-Memory Queues Active)
-    end
-    
-    C->>O: Emit Event[fault.recovery.completed, target=broker-b, duration_ms=1840]
-    
     rect rgb(230, 255, 230)
-        Note over W,B: Normal Traffic Resumes
-        W->>B: Reconnect & Produce
-        B-->>W: ACK [Offset=monotonic]
+        Note over W,DE: Phase 2: Dynamic Route Steering
+        W->>C: Request Route for Next Batch
+        C-->>W: Route via Singapore Alternate Path / Local Buffer
+        W->>DE: Forward via Optimal Route
+        DE-->>W: Fast ACK in 45ms (Slow Link Bypassed!)
     end
+
+    Note over C,W: Phase 3: Regional Blackout (Kill Singapore Region)
+    F->>F: docker stop hydra-broker-singapore
+    C->>C: Detect Outage: Switch Surviving Nodes (India & Germany) to Local Quorum
+    W->>IN: Produce to India Topic
+    IN-->>W: ACK (Surviving regions continue operating without freezing!)
 ```
 
 ---
 
-## 9. Correctness Oracle In-Memory Data Model (Pure RAM Structs — No Database)
+## 6. Correctness Oracle In-Memory Data Model (RAM Structs — Zero Database)
 
 > [!NOTE]
-> No database (SQL, NoSQL, or embedded) is used. The verification engine maintains high-speed in-memory data structures (hash maps, vectors, and concurrent queues in RAM) to track and reconcile message lifecycles in real time.
+> No database (SQL, NoSQL, or embedded) is used. The verification engine maintains high-speed in-memory data structures (hash maps, vectors, and concurrent queues in RAM) to track and reconcile message lifecycles and compliance in real time.
 
 ```mermaid
 classDiagram
     class InMemoryLedger {
         +map~uint64, MessageRecord~ in_flight_messages
+        +vector~ResidencyAuditRecord~ residency_audits
         +vector~FaultRecord~ fault_timeline
-        +record_send(seq, producer_id, timestamp)
-        +record_ack(seq, broker_id, offset)
-        +record_delivery(seq, consumer_id, offset)
-        +reconcile_invariants() InvariantResult
+        +record_send(seq, producer_id, target_region)
+        +record_ack(seq, broker_id, broker_region, offset)
+        +verify_legal_residency(allowed_region) bool
+        +verify_no_acknowledged_loss() bool
+        +verify_no_cluster_freeze() bool
     }
 
     class MessageRecord {
-        +uint64 run_id
-        +uint32 producer_id
         +uint64 sequence_number
+        +string topic_name
+        +string target_legal_region
+        +string actual_broker_region
         +uint64 assigned_offset
-        +uint64 send_timestamp_ns
-        +uint64 ack_timestamp_ns
+        +uint64 latency_ns
         +string outcome_state
     }
 
-    class DeliveryRecord {
-        +uint32 consumer_id
-        +uint64 delivery_timestamp_ns
-        +uint64 consumed_offset
+    class ResidencyAuditRecord {
+        +string topic_name
+        +string required_jurisdiction
+        +string observed_broker_id
+        +string observed_region
+        +bool compliant
     }
 
     class FaultRecord {
         +string fault_id
-        +string target_broker
-        +string action_type
+        +string fault_type
+        +string target_region
         +uint64 scheduled_ns
         +uint64 executed_ns
-        +string outcome
+        +string status
     }
 
-    class InvariantResult {
-        +bool offsets_monotonic
-        +bool no_loss_detected
-        +bool bounded_queue_respected
-        +uint64 duplicate_count
-    }
-
-    InMemoryLedger *-- MessageRecord : stores in RAM
-    MessageRecord o-- DeliveryRecord : consumer observation
-    InMemoryLedger o-- FaultRecord : fault history in RAM
-    InMemoryLedger ..> InvariantResult : computes in memory
+    InMemoryLedger *-- MessageRecord : tracks in RAM
+    InMemoryLedger *-- ResidencyAuditRecord : compliance audits
+    InMemoryLedger o-- FaultRecord : fault history
 ```
 
 ---
 
-## 10. Correctness Ledger Reconciliation Flow
-
-```mermaid
-flowchart TD
-    JSONL[("events.jsonl (Event Stream)")] --> READER["Ledger Stream Reader"]
-    
-    READER --> EV_ROUTER{"Event Type"}
-    EV_ROUTER -->|produce.attempted| S1["Bucket: attempted (Total Sent)"]
-    EV_ROUTER -->|produce.acknowledged| S2["Bucket: acknowledged (Confirmed Received)"]
-    EV_ROUTER -->|produce.timeout| S3["Bucket: unknown_outcome (Ambiguous)"]
-    EV_ROUTER -->|produce.rejected| S4["Bucket: rejected (Definite Failures)"]
-    EV_ROUTER -->|consumer.delivered| S5["Bucket: delivered (Consumer Observed)"]
-    EV_ROUTER -->|consumer.committed| S6["Bucket: committed (Offsets Progressed)"]
-
-    S1 --> RECON["Oracle Reconciliation Engine (In-Memory)"]
-    S2 --> RECON
-    S3 --> RECON
-    S4 --> RECON
-    S5 --> RECON
-    S6 --> RECON
-
-    subgraph ASSERTIONS["Evaluated Invariants"]
-        A1["Invariant: partition_offsets_monotonic"]
-        A2["Invariant: no_acknowledged_message_loss\n(ack in delivered)"]
-        A3["Invariant: queue_capacity_respected"]
-        A4["Invariant: no_duplicate_delivery\n(Strict Exactly-Once if enabled)"]
-    end
-
-    RECON --> A1
-    RECON --> A2
-    RECON --> A3
-    RECON --> A4
-
-    A1 --> STATUS{"All Invariants Passed?"}
-    A2 --> STATUS
-    A3 --> STATUS
-    A4 --> STATUS
-
-    STATUS -->|Yes| PASS["Correctness Status: PASSED"]
-    STATUS -->|Assertion Failed| FAIL["Correctness Status: FAILED"]
-    STATUS -->|Missing Observations| INCONC["Correctness Status: INCONCLUSIVE"]
-```
-
----
-
-## 11. Metrics Aggregation & Reporting Pipeline
+## 7. Metrics Aggregation & Reporting Pipeline
 
 ```mermaid
 flowchart LR
     subgraph INGESTION["Raw Stream"]
-        RAW["events.jsonl"] --> PARSER["Metrics Parser"]
+        RAW["events.jsonl"] --> PARSER["Metrics & Audit Parser"]
     end
 
-    subgraph COMPUTATION["Aggregation Engine"]
-        PARSER --> LAT_HIST["HdrHistogram / Fast Latency Bins\n(P50, P95, P99)"]
-        PARSER --> TPS_CALC["Throughput Rolling Window\n(Msg/sec, MB/sec)"]
-        PARSER --> ERR_CALC["Error & Timeout Rate Counter"]
-        PARSER --> HEALTH_HIST["Broker Health Timeline Tracker"]
+    subgraph COMPUTATION["Verification & Statistics Engine"]
+        PARSER --> LAT_HIST["Latency Percentiles (P50, P95, P99)"]
+        PARSER --> TPS_CALC["Throughput (Msg/sec, MB/sec)"]
+        PARSER --> RES_AUDIT["Legal Residency Audit (GDPR Check)"]
+        PARSER --> SLOW_AUDIT["Slow-Link Bypass Verification"]
+        PARSER --> OUTAGE_AUDIT["Cluster Non-Freeze Verification"]
     end
 
     subgraph ARTIFACTS["Run Output Artifacts"]
-        LAT_HIST --> JSON_REP["report.json\n(Machine Readable)"]
+        LAT_HIST --> JSON_REP["report.json\n(Machine-Readable Results)"]
         TPS_CALC --> JSON_REP
-        ERR_CALC --> JSON_REP
-        HEALTH_HIST --> JSON_REP
+        RES_AUDIT --> JSON_REP
+        SLOW_AUDIT --> JSON_REP
+        OUTAGE_AUDIT --> JSON_REP
 
-        JSON_REP --> MD_REP["report.md\n(Human-Readable Summary)"]
+        JSON_REP --> MD_REP["report.md\n(Human-Readable Executive Summary)"]
     end
 ```

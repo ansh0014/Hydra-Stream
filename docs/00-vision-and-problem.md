@@ -1,62 +1,53 @@
-# 00 — Vision and Problem
+# 00 — Vision and Problem Statement
 
-## 1. Vision
+## 1. Vision & Core Mission
 
-Build a simulation engine that can repeatedly exercise Hydra Stream under controlled workloads and failures, then produce evidence about performance, correctness and recovery.
+> **"Build a Kafka-style broker that keeps data inside its legal region, routes around slow links, and survives a regional outage without freezing."**  
+> *(Expected Outcome: SDG 9.1 — Resilient Infrastructure)*
 
-The goal is not merely to send messages. The goal is to answer questions such as:
+Modern event-driven architectures power global digital infrastructure. However, as organizations operate across international borders, existing streaming systems face three severe operational and regulatory obstacles:
 
-- What happens to producer requests when one broker becomes unavailable?
-- Does a slow consumer cause bounded backpressure or unbounded memory growth?
-- How does throughput and tail latency change during a traffic burst?
-- Can acknowledged messages be recovered after a broker restart, according to the configured durability contract?
-- How long does a broker take to become healthy again?
-- Which guarantees are supported by the current cluster implementation, and which are not yet implemented?
+1. **Strict Legal Data Residency (GDPR, Digital Personal Data Protection laws)**: Data generated within a jurisdiction (e.g., European Union) must legally stay within permitted borders.
+2. **Fragility to Degraded & Slow Network Links**: Transcontinental and cross-datacenter fiber links frequently experience latency spikes, jitter, and packet loss. Traditional static partition routing stalls entire producer pipelines.
+3. **Cluster Deadlocks on Regional Outage**: Synchronous cross-region consensus models frequently freeze entire clusters when one region becomes unreachable.
 
-## 2. Problem
+Hydra Stream solves these challenges through a **region-aware, dynamically routed, resilient Kafka-style streaming architecture**.
 
-Manual testing is insufficient for a distributed broker because results depend on workload shape, timing, topology and failure conditions. A successful happy-path demonstration says little about behavior during overload or failure.
+---
 
-Hydra Stream needs a repeatable test environment that can:
+## 2. The Core Problems with Traditional Kafka
 
-1. Generate controlled traffic.
-2. Introduce known faults at known experiment-relative times.
-3. Observe client and broker behavior.
-4. Verify message and offset invariants.
-5. Save enough metadata to reproduce and compare runs.
+### Problem A: Region Blindness & Data Sovereignty Violations
+* Kafka clusters have no native understanding of national jurisdictions.
+* Partitions are hashed blindly across any available broker (`hash(key) % N`).
+* A producer writing EU patient records or financial transactions in Germany can be assigned to a broker in the US or India, resulting in **regulatory violations and heavy legal fines**.
 
-## 3. Proposed guiding principles
+### Problem B: Head-of-Line Blocking on Degraded Links
+* In standard Kafka, a topic partition has a single static leader broker.
+* If the network link to that leader slows down from 30ms to 400ms:
+  * The producer's internal buffer (`RecordAccumulator`) fills up.
+  * Memory limits are reached, blocking the producer application entirely.
+  * Healthy brokers in other regions sit completely idle while traffic stalls.
 
-1. **Correctness before performance claims.** A fast run that loses acknowledged messages is not a successful run.
-2. **Repeatable inputs.** Save configuration, seed, build identity, topology and fault schedule.
-3. **Independent test system.** The simulator must not require Kafka, Redis or another broker to coordinate itself.
-4. **External fault control.** Faults are injected from outside the broker process.
-5. **Separate generation from verification.** The workload engine creates traffic; the oracle evaluates observations.
-6. **Capability-aware assertions.** Never claim replication or failover guarantees that Hydra Stream has not implemented.
-7. **Bounded resource use.** Simulator queues, event buffers and in-flight requests need limits.
-8. **Safe by default.** Destructive faults are allowed only against explicitly selected disposable test environments.
+### Problem C: Quorum Freezes During Regional Disasters
+* Synchronous metadata consensus engines (KRaft / ZooKeeper) require a majority quorum.
+* If a primary region fails or network partitioning isolates a region, the surviving nodes often lose quorum and **freeze all read and write traffic**, turning a regional outage into a global service catastrophe.
 
-## 4. Non-goals for the first version
+---
 
-- Kafka protocol compatibility.
-- Production chaos engineering against live infrastructure.
-- Automatic global multi-region deployment.
-- Exactly-once processing claims.
-- Consensus or leader election implemented by the simulator.
-- A polished dashboard before reliable experiment execution.
-- Replacing the broker's own unit and integration tests.
+## 3. The 3 Architectural Guarantees of Hydra Stream
 
-## 5. Success definition
+| Guarantee | Mechanism | Success Metric |
+|---|---|---|
+| **1. Legal Data Residency** | Dynamic region tags on brokers and topics. Control Plane validates every route against legal policy. | **0 bytes** of region-locked data ever touch foreign regional brokers. |
+| **2. Dynamic Slow-Link Routing** | Real-time link latency tracking. Dynamic score-weighted routing steers traffic around degraded links. | Ingress throughput maintains >80% capacity during a 300ms link latency spike. |
+| **3. Non-Freezing Regional Outage Survival** | Regional autonomy and local quorum mode when a remote region goes dark. | Zero cluster lockups or thread deadlocks when an entire region is severed. |
 
-The first meaningful success is an experiment that:
+---
 
-- Starts three independent broker processes in a local test environment.
-- Generates producer and consumer traffic through Hydra Stream's supported client interface.
-- Stops and restarts a selected broker during the run.
-- Captures the fault timeline and client-visible outcomes.
-- Produces metrics and a machine-readable report.
-- Clearly distinguishes passed, failed, skipped and unsupported assertions.
+## 4. Guiding Principles
 
-## 6. Relationship to Hydra Stream
-
-The simulator supports the larger Hydra Stream goals: reproducible load testing, fault injection, latency measurement, crash recovery testing and observable regional resilience. It does not implement broker functionality itself.
+1. **Correctness Before Throughput**: Delivering a message to an illegal jurisdiction or losing an acknowledged message is a catastrophic failure.
+2. **Leverage Best-of-Breed Infrastructure**: We do not reinvent basic tools. We use **`etcd`** for dynamic discovery, **Prometheus** for metrics, and **Envoy** for dynamic connection proxying.
+3. **Decouple the Control Plane from the Data Plane**: The Go Control Plane makes routing and policy decisions; the C++ Hydra Brokers handle high-throughput in-memory message dispatching.
+4. **Self-Verifying Chaos Engine**: The platform includes its own built-in simulator that injects link latency and regional blackouts to mathematically verify system behavior.

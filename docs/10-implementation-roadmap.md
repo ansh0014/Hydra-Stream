@@ -1,109 +1,67 @@
 # 10 — Implementation Roadmap
 
-## Overview
-
-Build the simulator incrementally. Do not wait for a complete distributed broker to begin implementing the experiment infrastructure, but do not claim unsupported distributed guarantees.
+## Phased Delivery Plan
 
 ```mermaid
-flowchart TD
-    P0[Phase 0: Inspect broker contracts] --> P1[Phase 1: Three-broker environment]
-    P1 --> P2[Phase 2: Workload generator]
-    P2 --> P3[Phase 3: Experiment controller]
-    P3 --> P4[Phase 4: Broker stop/restart]
-    P4 --> P5[Phase 5: Oracle and reports]
-    P5 --> P6[Phase 6: Network fault injection]
-    P6 --> P7[Phase 7: Dashboard and scheduled runs]
-    P7 --> P8[Phase 8: Advanced distributed assertions]
+flowchart LR
+    subgraph M1["Milestone 1: Dynamic Discovery & Daemonization"]
+        direction TB
+        M1_A["Refactor C++ Broker into Standalone Daemon"]
+        M1_B["Add Socket / Network Listener (:9092)"]
+        M1_C["Add Dynamic etcd Registration with Leases"]
+    end
+
+    subgraph M2["Milestone 2: Hydra Control Plane (Go)"]
+        direction TB
+        M2_A["Build Go Control Plane Core"]
+        M2_B["Dynamic etcd Broker Watcher"]
+        M2_C["Legal Region Policy Enforcer (Germany/India/SG)"]
+    end
+
+    subgraph M3["Milestone 3: Dynamic Slow-Link Routing"]
+        direction TB
+        M3_A["Prometheus Link Latency Scraping"]
+        M3_B["Dynamic Latency Score Calculation"]
+        M3_C["Adaptive Traffic Steering (Bypassing Slow Links)"]
+    end
+
+    subgraph M4["Milestone 4: Chaos Engine & Verification"]
+        direction TB
+        M4_A["Linux tc netem Fault Injection"]
+        M4_B["Regional Blackout Simulation"]
+        M4_C["Correctness Oracle Assertion Auditing"]
+    end
+
+    M1 --> M2
+    M2 --> M3
+    M3 --> M4
 ```
 
-## Phase 0 — Inspect existing implementation
+---
 
-Deliverables:
-- Broker startup command and configuration.
-- Current network protocol/client API.
-- Produce/fetch/commit semantics.
-- Health and metrics capabilities.
-- Broker identity and storage path.
-- Current cluster/replication capabilities.
+## Milestone Descriptions
 
-Exit criteria: simulator interfaces are based on actual code, not guessed endpoints.
+### Milestone 1: Dynamic Discovery & Daemonization (Current Target)
+* Transform `Hydrosync` into a standalone network daemon.
+* Add socket listener for basic `PRODUCE` and `FETCH` frames.
+* Implement broker startup registration to `etcd` (`/registry/brokers/<id>`).
+* Verify 3 broker containers (`India`, `Germany`, `Singapore`) start and register dynamically in Docker.
 
-## Phase 1 — Three-broker environment
+### Milestone 2: Hydra Control Plane (Go)
+* Implement Go Control Plane service.
+* Discover regional brokers dynamically via `etcd`.
+* Implement topic metadata service enforcing legal data-residency rules (e.g. EU data locked to Germany).
+* Reject unauthorized cross-border requests.
 
-Deliverables:
-- Three independent broker containers.
-- Separate persistent volumes.
-- Dedicated Compose project/network.
-- Broker readiness checks.
-- Safe start/stop operations.
+### Milestone 3: Dynamic Slow-Link Routing
+* Connect Prometheus latency scraping to the Control Plane.
+* Calculate dynamic link health scores.
+* Steer producer traffic away from degraded links to fast regional paths.
 
-Exit criteria: three broker processes start and can be independently inspected and restarted.
-
-## Phase 2 — C++ workload generator
-
-Deliverables:
-- Client adapter.
-- Producer and consumer workers.
-- Unique message IDs.
-- Constant-rate workload.
-- Bounded in-flight requests.
-- Client event output.
-
-Exit criteria: multiple producers and consumers exchange messages through the real broker interface.
-
-## Phase 3 — Go experiment controller
-
-Deliverables:
-- YAML schema and validator.
-- Run ID and artifact directory.
-- Lifecycle state machine.
-- Child-process supervision.
-- Experiment-relative scheduler.
-
-Exit criteria: a baseline experiment can run end-to-end without faults.
-
-## Phase 4 — Broker fault injection
-
-Deliverables:
-- Broker stop/start adapters.
-- Active fault registry.
-- Recovery handling.
-- Fault event timeline.
-
-Exit criteria: stop and restart a broker during active workload and save observations.
-
-## Phase 5 — Oracle and reporting
-
-Deliverables:
-- Message and offset ledger.
-- Assertion status model.
-- Latency histogram.
-- Throughput/error metrics.
-- JSON and Markdown report.
-
-Exit criteria: report separates execution outcome, correctness outcome and performance outcome.
-
-## Phase 6 — Network faults
-
-Deliverables:
-- Dedicated namespace/network rules.
-- Latency, jitter and packet loss.
-- Link-scoped partition.
-- Guaranteed cleanup/recovery.
-
-Exit criteria: faults affect only intended test links and are fully reversible.
-
-## Phase 7 — Dashboard and recurring experiments
-
-Deliverables:
-- Run history.
-- Fault timeline.
-- Latency/throughput charts.
-- Comparison view.
-- Optional scheduler integration.
-
-Exit criteria: dashboard reads saved experiment data and does not participate in broker-critical operations.
-
-## Phase 8 — Advanced distributed assertions
-
-Add replication lag, leader epoch, split-brain, failover, regional placement and residency assertions only after corresponding broker capabilities and observations exist.
+### Milestone 4: Chaos Engine & Invariant Verification
+* Implement experiment scheduler (YAML scenarios).
+* Inject `tc netem` latency spikes and regional container stops.
+* Run the Correctness Oracle to mathematically verify:
+  1. Zero message loss.
+  2. Zero residency violations.
+  3. No cluster freeze on regional blackout.
