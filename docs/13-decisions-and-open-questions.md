@@ -10,10 +10,27 @@
 | **ADR-004** | **3-Region Model (India, Germany, Singapore)** | Provides clear demonstration of legal data residency (Germany/EU GDPR) and inter-region slow link steering. | **Accepted** |
 | **ADR-005** | **No Third-Party Paid Tools for Chaos/Oracle** | Correctness Oracle and simulation scheduler run 100% locally in Go/C++ without commercial dependencies. | **Accepted** |
 | **ADR-006** | **Prometheus for Link Latency Tracking** | Standard time-series scraping for network RTT and broker health metrics. | **Accepted** |
+| **ADR-007** | **Storage Strategy: Reject External Databases (Redis/Cassandra)** | External databases introduce unnecessary network hops (1–5ms latency), network bottlenecks, and severe tombstone compaction issues (Cassandra). Message queues remain in-process (RAM Bounded Queues, with embedded RocksDB for persistent disk tiering). Metadata is stored in `etcd`. | **Accepted** |
 
 ---
 
-## 2. Open Questions & Resolution Status
+## 2. Deep Dive: Storage Architecture Evaluation (ADR-007)
+
+### Why Not Redis?
+* Redis is an in-memory database that offers its own streaming engine (`XADD`/`XREAD`). Placing Redis behind Hydra Stream turns the C++ broker into a redundant proxy and introduces external network roundtrips.
+
+### Why Not Cassandra / ScyllaDB?
+* Cassandra is an append-oriented distributed database designed for broad queries, not FIFO message queues.
+* As consumers continuously read and dequeue streaming data, Cassandra accumulates millions of delete tombstones, causing compaction stalls, read timeouts, and GC pauses.
+
+### Chosen Tiered Architecture:
+1. **Metadata Tier**: `etcd` (Raft consensus, B-tree storage, dynamic node discovery).
+2. **Streaming Data Tier**: In-process C++ bounded memory queues (`ConcurrentQueue<Message>`) for nanosecond/microsecond dispatching.
+3. **Optional Persistent Tier**: Embedded **RocksDB** (C++ LSM-tree library running in the same process space, zero network hops).
+
+---
+
+## 3. Open Questions & Resolution Status
 
 1. **Q: How does the C++ broker register with etcd?**  
    *Option A*: Direct etcd gRPC / v3 HTTP client inside C++.  

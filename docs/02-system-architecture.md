@@ -104,3 +104,29 @@ Every network frame exchanged between clients and the broker follows a lean bina
   * `0x0003` : `FETCH_REQ` (requests messages starting at offset)
   * `0x0004` : `FETCH_RES`
   * `0x0005` : `HEALTH_PING`
+
+---
+
+## 4. Storage Architecture & Database Evaluation
+
+Hydra Stream deliberately avoids external databases (like Redis or Cassandra) for message handling to maintain sub-millisecond latencies and avoid tombstone bottlenecks:
+
+```
++---------------------------------------------------------------------------------+
+|                       HYDRA TWO-TIER STORAGE ARCHITECTURE                       |
++---------------------------------------------------------------------------------+
+|                                                                                 |
+|  1. Metadata Tier: etcd (Distributed Key-Value Engine)                          |
+|     - Manages cluster topology, broker leases, and regional policies.            |
+|     - Strongly consistent (Raft consensus) with zero hardcoded IPs.             |
+|                                                                                 |
+|  2. Message Data Tier: In-Process C++ Bounded Memory / Embedded RocksDB         |
+|     - High-speed in-memory queues (RAM) with condition-variable backpressure.   |
+|     - Zero network hops between broker and storage.                             |
+|     - Optional disk persistence via embedded RocksDB (LSM-tree library in C++). |
+|                                                                                 |
++---------------------------------------------------------------------------------+
+```
+
+* **Why No External Redis**: An external Redis instance adds 1–3ms network roundtrips per message batch and converts the broker into a redundant proxy.
+* **Why No Cassandra**: Streaming consumers continuously pull and delete/commit messages. In Cassandra, deletes create massive **tombstone markers**, which lead to compaction stalls, read timeouts, and severe JVM GC pauses.
