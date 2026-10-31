@@ -30,7 +30,7 @@ export default function Header({ activeTab, setActiveTab, clusterHealth, onSync 
   const navItems = [
     { id: 'landing', label: 'Story & Pitch', icon: Globe },
     { id: 'topology', label: 'Topology & Map', icon: Layers },
-    { id: 'kafka-ui', label: 'Kafka-UI', icon: Box },
+    { id: 'kafka', label: 'Kafka-UI', icon: Box },
     { id: 'chaos', label: 'Chaos Studio', icon: Zap },
     { id: 'compliance', label: 'GDPR Vault', icon: Shield },
   ];

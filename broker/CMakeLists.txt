@@ -40,6 +40,10 @@ target_link_libraries(hydra_broker
         hydra_core
 )
 
+if(NOT WIN32)
+    target_link_options(hydra_broker PRIVATE -static-libgcc -static-libstdc++)
+endif()
+
 add_executable(hydra_benchmark
     benchmark/benchmark.cpp
 )

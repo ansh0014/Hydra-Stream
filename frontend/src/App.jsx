@@ -246,11 +246,11 @@ export default function App() {
   };
 
   const activeRoutes = {
-    'gdpr-user-audit': regions.germany.status === 'OFFLINE' ? 'QUARANTINED (403)' : regions.germany.id,
-    'eu-payments': regions.germany.status === 'OFFLINE' ? 'QUARANTINED (403)' : regions.germany.id,
-    'upi-transactions': regions.india.status === 'OFFLINE' ? 'QUARANTINED (403)' : regions.india.id,
-    'apac-fx': regions.singapore.status === 'OFFLINE' ? 'QUARANTINED (403)' : regions.singapore.id,
-    'global-telemetry': regions.india.status === 'DEGRADED' ? regions.singapore.id : regions.india.id,
+    'gdpr-user-audit': regions?.germany?.status === 'OFFLINE' ? 'QUARANTINED (403)' : (regions?.germany?.id || 'broker-germany-1'),
+    'eu-payments': regions?.germany?.status === 'OFFLINE' ? 'QUARANTINED (403)' : (regions?.germany?.id || 'broker-germany-1'),
+    'upi-transactions': regions?.india?.status === 'OFFLINE' ? 'QUARANTINED (403)' : (regions?.india?.id || 'broker-india-1'),
+    'apac-fx': regions?.singapore?.status === 'OFFLINE' ? 'QUARANTINED (403)' : (regions?.singapore?.id || 'broker-singapore-1'),
+    'global-telemetry': regions?.india?.status === 'DEGRADED' ? (regions?.singapore?.id || 'broker-singapore-1') : (regions?.india?.id || 'broker-india-1'),
   };
 
   return (
@@ -261,6 +261,7 @@ export default function App() {
         clusterHealth={clusterHealth}
         throughput={throughput}
         onRestore={handleRestore}
+        onSync={syncClusterTopology}
       />
 
       <main className="flex-1">

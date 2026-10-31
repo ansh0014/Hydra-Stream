@@ -18,8 +18,8 @@ spec:
     spec:
       containers:
         - name: broker
-          image: hydra-broker:dev
-          imagePullPolicy: IfNotPresent
+          image: hydra-broker:v1.0
+          imagePullPolicy: Never
           env:
             - name: BROKER_ID
               value: "broker-singapore-1"
@@ -29,6 +29,8 @@ spec:
               value: "9094"
             - name: HEALTH_PORT
               value: "8083"
+            - name: ETCD_ENDPOINT
+              value: "hydra-etcd:2379"
           ports:
             - containerPort: 9094
               name: tcp-ingress

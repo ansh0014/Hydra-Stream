@@ -51,7 +51,7 @@ export default function LandingView({ setActiveTab, throughput = 0, totalMessage
 
         <button
           type="button"
-          onClick={() => setActiveTab('kafka-ui')}
+          onClick={() => setActiveTab('kafka')}
           className="h-12 px-6 rounded-lg text-sm font-medium bg-white/5 hover:bg-white/10 text-white border border-white/10 transition-all flex items-center gap-2"
         >
           <span>Explore Kafka-UI Browser</span>

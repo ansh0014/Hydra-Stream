@@ -620,24 +620,24 @@ export default function TopologyView({ regions, throughput, totalMessages, gdprP
                     <span>{reg.flag}</span> REGION: {key.toUpperCase()}
                   </div>
                   <h4 className="text-lg font-medium text-white mt-1">{reg.id}</h4>
-                  <p className="text-xs text-gray-400 font-mono">TCP :{reg.endpoint.split(':')[1]} • Health :{reg.healthPort}</p>
+                  <p className="text-xs text-gray-400 font-mono">TCP :{reg.endpoint?.split(':')[1] || '9092'} • Health :{reg.healthPort || '8081'}</p>
                 </div>
                 <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-mono font-medium border ${badgeClass}`}>
-                  {reg.status}
+                  {reg.status || 'UNKNOWN'}
                 </span>
               </div>
               <div className="mt-4 pt-4 border-t border-white/5 space-y-2 text-xs font-mono">
                 <div className="flex justify-between text-gray-400">
                   <span>Link Probe RTT:</span>
-                  <span className="text-white font-medium">{reg.status === 'OFFLINE' ? 'OFFLINE' : `${reg.rtt} ms`}</span>
+                  <span className="text-white font-medium">{reg.status === 'OFFLINE' ? 'OFFLINE' : `${reg.rtt || 0} ms`}</span>
                 </div>
                 <div className="flex justify-between text-gray-400">
                   <span>Storage Engine:</span>
-                  <span className="text-gray-300">{reg.storage}</span>
+                  <span className="text-gray-300">{reg.storage || 'Embedded RocksDB'}</span>
                 </div>
                 <div className="flex justify-between text-gray-400">
                   <span>Bound Topics:</span>
-                  <span className="text-white font-medium">{reg.boundTopics.join(', ')}</span>
+                  <span className="text-white font-medium">{Array.isArray(reg.boundTopics) ? reg.boundTopics.join(', ') : 'All Topics'}</span>
                 </div>
               </div>
             </div>
