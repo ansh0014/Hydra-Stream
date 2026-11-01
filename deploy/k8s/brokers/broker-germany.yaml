@@ -20,7 +20,7 @@ spec:
     spec:
       containers:
         - name: broker
-          image: hydra-broker:v1.0
+          image: hydra-broker:v1.2
           imagePullPolicy: Never
           env:
             - name: BROKER_ID
@@ -33,6 +33,8 @@ spec:
               value: "8082"
             - name: ETCD_ENDPOINT
               value: "hydra-etcd:2379"
+            - name: ADVERTISED_HOST
+              value: "broker-germany"
           ports:
             - containerPort: 9093
               name: tcp-ingress

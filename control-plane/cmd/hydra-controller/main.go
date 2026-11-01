@@ -114,6 +114,15 @@ type RouteRequest struct {
 	ClientRegion string `json:"client_region"`
 }
 
+func (s *ControllerServer) handleTopics(w http.ResponseWriter, r *http.Request) {
+	topics := s.policyEngine.ListPolicies()
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"topics": topics,
+		"count":  len(topics),
+	})
+}
+
 func (s *ControllerServer) handleRouteResolve(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -213,6 +222,8 @@ func main() {
 	mux.HandleFunc("/api/v1/health", server.handleHealth)
 	mux.HandleFunc("/cluster/topology", server.handleTopology)
 	mux.HandleFunc("/api/v1/topology", server.handleTopology)
+	mux.HandleFunc("/cluster/topics", server.handleTopics)
+	mux.HandleFunc("/api/v1/topics", server.handleTopics)
 	mux.HandleFunc("/route/resolve", server.handleRouteResolve)
 	mux.HandleFunc("/api/v1/route/resolve", server.handleRouteResolve)
 	mux.HandleFunc("/api/v1/metrics", server.handleMetrics)

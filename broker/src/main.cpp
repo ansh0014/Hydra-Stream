@@ -52,7 +52,8 @@ namespace {
     }
 
     void register_broker_in_etcd(const std::string& etcd_addr, const std::string& broker_id,
-                                const std::string& region, uint16_t port, uint16_t health_port) {
+                                const std::string& region, uint16_t port, uint16_t health_port,
+                                const std::string& advertised_host = "") {
         if (etcd_addr.empty()) return;
 
         std::string host = etcd_addr;
@@ -85,9 +86,10 @@ namespace {
 
         if (connect(sock, res->ai_addr, static_cast<int>(res->ai_addrlen)) == 0) {
             std::string key = "/registry/brokers/" + broker_id;
+            std::string my_host = advertised_host.empty() ? broker_id : advertised_host;
             std::ostringstream val_json;
             val_json << "{\"id\":\"" << broker_id << "\",\"region\":\"" << region
-                     << "\",\"endpoint\":\"" << host << ":" << port
+                     << "\",\"endpoint\":\"" << my_host << ":" << port
                      << "\",\"health_port\":" << health_port << ",\"status\":\"HEALTHY\"}";
 
             std::string key_b64 = base64_encode(key);
@@ -125,6 +127,7 @@ int main(int argc, char* argv[]) {
     uint16_t health_port = static_cast<uint16_t>(std::stoi(get_env_or_default("HEALTH_PORT", "8081")));
     std::size_t threads = static_cast<std::size_t>(std::stoi(get_env_or_default("THREADS", "4")));
     std::string etcd_endpoint = get_env_or_default("ETCD_ENDPOINT", "");
+    std::string advertised_host = get_env_or_default("ADVERTISED_HOST", "");
 
     // CLI overrides
     for (int i = 1; i < argc; ++i) {
@@ -141,6 +144,8 @@ int main(int argc, char* argv[]) {
             threads = static_cast<std::size_t>(std::stoi(arg.substr(10)));
         } else if (arg.rfind("--etcd=", 0) == 0) {
             etcd_endpoint = arg.substr(7);
+        } else if (arg.rfind("--advertised-host=", 0) == 0) {
+            advertised_host = arg.substr(18);
         }
     }
 
@@ -172,7 +177,7 @@ int main(int argc, char* argv[]) {
 
         // Dynamic etcd self-registration
         if (!etcd_endpoint.empty()) {
-            register_broker_in_etcd(etcd_endpoint, broker_id, region, port, health_port);
+            register_broker_in_etcd(etcd_endpoint, broker_id, region, port, health_port, advertised_host);
         }
 
         std::cout << "Broker is ready and accepting requests. Press Ctrl+C to exit.\n";
@@ -185,7 +190,7 @@ int main(int argc, char* argv[]) {
             if (heartbeat_counter >= 10) { // every 5 seconds
                 heartbeat_counter = 0;
                 if (!etcd_endpoint.empty()) {
-                    register_broker_in_etcd(etcd_endpoint, broker_id, region, port, health_port);
+                    register_broker_in_etcd(etcd_endpoint, broker_id, region, port, health_port, advertised_host);
                 }
             }
         }

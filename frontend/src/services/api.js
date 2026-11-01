@@ -1,79 +1,38 @@
 /**
- * Hydra Stream - Real API Client
- * Connects directly to the Hydra Control Plane & Prometheus.
- * Zero hardcoded mock states.
+ * Hydra Stream - Dynamic Real API Client
+ * Zero hardcoded mock brokers or fake endpoints.
+ * Everything is fetched dynamically from the Go Control Plane, etcd, and Prometheus.
  */
 
 export const API_BASE = '/api/v1';
 
-export const REGION_METADATA = {
+/**
+ * Geographic projection coordinates for rendering nodes on the world map canvas.
+ * (Pure visual metadata; node status, endpoints, and health are 100% dynamic from etcd).
+ */
+export const REGION_COORDINATES = {
   india: {
-    name: 'India (Mumbai Central)',
-    flag: '🇮🇳',
     lat: 19.0760,
     lng: 72.8777,
-    policy: 'India Domestic (RBI Sovereign Lock)',
-    storage: 'Embedded RocksDB (C++17)',
+    flag: '🇮🇳',
+    name: 'India (Mumbai Central)',
   },
   germany: {
-    name: 'Germany (Frankfurt EU)',
-    flag: '🇩🇪',
     lat: 50.1109,
     lng: 8.6821,
-    policy: 'EU GDPR Article 44 Strict Lock',
-    storage: 'Embedded RocksDB (C++17)',
+    flag: '🇩🇪',
+    name: 'Germany (Frankfurt EU)',
   },
   singapore: {
-    name: 'Singapore (Changi Hub)',
-    flag: '🇸🇬',
     lat: 1.3521,
     lng: 103.8198,
-    policy: 'APAC Open Transit & Cross-Border Fallback',
-    storage: 'Embedded RocksDB (C++17)',
+    flag: '🇸🇬',
+    name: 'Singapore (Changi Hub)',
   },
 };
 
-// Declared Governance Topics matching Hydra Policy Engine
-export const CLUSTER_TOPICS = [
-  {
-    name: 'gdpr-user-audit',
-    partitions: 4,
-    legalRegion: 'Germany',
-    compliance: 'EU GDPR Art. 44 (Strict Zero Cross-Border)',
-    color: 'purple',
-  },
-  {
-    name: 'eu-payments',
-    partitions: 4,
-    legalRegion: 'Germany',
-    compliance: 'EU PSD2 & GDPR Financial Isolation',
-    color: 'purple',
-  },
-  {
-    name: 'upi-transactions',
-    partitions: 4,
-    legalRegion: 'India',
-    compliance: 'RBI Sovereign Data Localization Directive',
-    color: 'emerald',
-  },
-  {
-    name: 'apac-fx',
-    partitions: 4,
-    legalRegion: 'Singapore',
-    compliance: 'APAC Cross-Border Low-Latency Transit',
-    color: 'cyan',
-  },
-  {
-    name: 'global-telemetry',
-    partitions: 6,
-    legalRegion: 'ANY',
-    compliance: 'Adaptive Fast-Path Rerouting (Undersea Cut Bypass)',
-    color: 'sky',
-  },
-];
-
 /**
- * Fetch live cluster topology registered dynamically in etcd.
+ * Fetch live cluster brokers registered dynamically in etcd.
  */
 export async function fetchTopology() {
   const res = await fetch(`${API_BASE}/topology`);
@@ -81,6 +40,18 @@ export async function fetchTopology() {
     throw new Error(`Failed to fetch topology: ${res.statusText}`);
   }
   return await res.json();
+}
+
+/**
+ * Fetch live governance topics from the Go Control Plane Policy Engine.
+ */
+export async function fetchTopics() {
+  const res = await fetch(`${API_BASE}/topics`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch topics: ${res.statusText}`);
+  }
+  const data = await res.json();
+  return (data && Array.isArray(data.topics)) ? data.topics : [];
 }
 
 /**
@@ -100,9 +71,23 @@ export async function resolveRoute(topic, clientRegion = 'India') {
 }
 
 /**
- * Check cluster health from control plane.
+ * Check cluster health from control plane bridge.
  */
 export async function fetchHealth() {
   const res = await fetch('/health');
+  if (!res.ok) {
+    throw new Error(`Health check failed: ${res.statusText}`);
+  }
+  return await res.json();
+}
+
+/**
+ * Query Prometheus link latency metric.
+ */
+export async function fetchLatencyMetrics() {
+  const res = await fetch(`${API_BASE}/metrics/latency`);
+  if (!res.ok) {
+    throw new Error(`Metrics failed: ${res.statusText}`);
+  }
   return await res.json();
 }

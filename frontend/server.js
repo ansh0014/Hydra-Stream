@@ -75,7 +75,25 @@ app.post('/api/v1/route/resolve', async (req, res) => {
   }
 });
 
-// 4. Prometheus Live Link Latency Proxy
+// 4. Topics & Policies - Governance topics from Go Control Plane
+app.get('/api/v1/topics', async (req, res) => {
+  try {
+    const response = await fetch(`${CONTROLLER_URL}/api/v1/topics`);
+    if (!response.ok) {
+      return res.status(response.status).json({ error: `Controller error: ${response.statusText}` });
+    }
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    res.status(503).json({
+      topics: [],
+      count: 0,
+      error: `Failed to fetch topics from Control Plane: ${err.message}`,
+    });
+  }
+});
+
+// 5. Prometheus Live Link Latency Proxy
 app.get('/api/v1/metrics/latency', async (req, res) => {
   const query = req.query.query || 'hydra_broker_ping_rtt_seconds';
   try {

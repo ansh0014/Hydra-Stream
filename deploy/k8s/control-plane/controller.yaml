@@ -29,8 +29,8 @@ spec:
     spec:
       containers:
         - name: controller
-          image: hydra-controller:dev
-          imagePullPolicy: IfNotPresent
+          image: hydra-controller:v1.2
+          imagePullPolicy: Never
           envFrom:
             - configMapRef:
                 name: hydra-controller-config

@@ -58,6 +58,17 @@ func (pe *PolicyEngine) RegisterPolicy(policy types.TopicPolicy) {
 	pe.policies[policy.Name] = policy
 }
 
+// ListPolicies returns all currently registered topic governance policies.
+func (pe *PolicyEngine) ListPolicies() []types.TopicPolicy {
+	pe.mu.RLock()
+	defer pe.mu.RUnlock()
+	res := make([]types.TopicPolicy, 0, len(pe.policies))
+	for _, p := range pe.policies {
+		res = append(res, p)
+	}
+	return res
+}
+
 // GetPolicy retrieves the policy for a topic. If not explicitly registered,
 // it applies inferential heuristics (e.g. topic prefix/suffix) or defaults to ANY.
 func (pe *PolicyEngine) GetPolicy(topic string) types.TopicPolicy {

@@ -245,9 +245,9 @@ export default function TopologyView({ regions, throughput, totalMessages, gdprP
 
       // 4. Calculate Regional Node Screen Positions
       const nodePos = {
-        germany: geoToCanvas(regions.germany.lat, regions.germany.lng, w, h),
-        india: geoToCanvas(regions.india.lat, regions.india.lng, w, h),
-        singapore: geoToCanvas(regions.singapore.lat, regions.singapore.lng, w, h),
+        germany: (regions?.germany?.lat && regions?.germany?.lng) ? geoToCanvas(regions.germany.lat, regions.germany.lng, w, h) : null,
+        india: (regions?.india?.lat && regions?.india?.lng) ? geoToCanvas(regions.india.lat, regions.india.lng, w, h) : null,
+        singapore: (regions?.singapore?.lat && regions?.singapore?.lng) ? geoToCanvas(regions.singapore.lat, regions.singapore.lng, w, h) : null,
       };
 
       // Great-circle links definitions
@@ -274,6 +274,7 @@ export default function TopologyView({ regions, throughput, totalMessages, gdprP
 
         const reg1 = regions[l.src];
         const reg2 = regions[l.dst];
+        if (!reg1 || !reg2) return;
         const isOffline = reg1.status === 'OFFLINE' || reg2.status === 'OFFLINE';
         const isDegraded = reg1.status === 'DEGRADED' || reg2.status === 'DEGRADED';
 
@@ -354,7 +355,7 @@ export default function TopologyView({ regions, throughput, totalMessages, gdprP
 
         const reg1 = regions[link.src];
         const reg2 = regions[link.dst];
-        if (reg1.status === 'OFFLINE' || reg2.status === 'OFFLINE') return;
+        if (!reg1 || !reg2 || reg1.status === 'OFFLINE' || reg2.status === 'OFFLINE') return;
 
         p.t += p.speed;
         if (p.t > 1) {
@@ -363,6 +364,7 @@ export default function TopologyView({ regions, throughput, totalMessages, gdprP
         }
 
         const arcHeight = link.id === 'de-sg' ? 75 : 55;
+        if (!nodePos[link.src] || !nodePos[link.dst]) return;
         const pos = getArcPoint(nodePos[link.src], nodePos[link.dst], p.t, arcHeight);
 
         // Keep last 4 trail positions
@@ -400,6 +402,7 @@ export default function TopologyView({ regions, throughput, totalMessages, gdprP
       Object.keys(nodePos).forEach((key) => {
         const node = nodePos[key];
         const reg = regions[key];
+        if (!node || !reg) return;
 
         let coreColor = '#ffffff';
         let glowColor = 'rgba(255, 255, 255, 0.4)';

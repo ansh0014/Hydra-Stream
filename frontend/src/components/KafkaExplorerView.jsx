@@ -1,22 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Send, ShieldAlert, CheckCircle2, Search, ArrowRight } from 'lucide-react';
 
-export default function KafkaExplorerView({ topics, messages, onPublishMessage, activeRoutes }) {
-  const [selectedTopic, setSelectedTopic] = useState(topics[0]);
+export default function KafkaExplorerView({ topics = [], messages = [], onPublishMessage, activeRoutes = {} }) {
+  const [selectedTopic, setSelectedTopic] = useState(topics[0] || null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [publishTopic, setPublishTopic] = useState(topics[0].name);
+  const [publishTopic, setPublishTopic] = useState(topics[0]?.name || '');
   const [publishPayload, setPublishPayload] = useState('{\n  "userId": "eu_usr_77201",\n  "auditEvent": "GDPR_DATA_CONSENT_CHECK",\n  "jurisdiction": "DE_EU"\n}');
   const [publishStatus, setPublishStatus] = useState(null);
 
-  const filteredTopics = topics.filter(
+  useEffect(() => {
+    if (!selectedTopic && topics.length > 0) {
+      setSelectedTopic(topics[0]);
+      setPublishTopic(topics[0].name);
+    }
+  }, [topics, selectedTopic]);
+
+  const filteredTopics = (topics || []).filter(
     (t) =>
-      t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.legalRegion.toLowerCase().includes(searchTerm.toLowerCase())
+      (t.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (t.legalRegion || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const topicMessages = messages.filter((m) => m.topic === selectedTopic.name);
+  const topicMessages = selectedTopic
+    ? (messages || []).filter((m) => m.topic === selectedTopic.name)
+    : [];
 
-  const handlePublish = () => {
+  const handlePublish = async () => {
     try {
       JSON.parse(publishPayload);
     } catch (e) {
@@ -27,7 +36,15 @@ export default function KafkaExplorerView({ topics, messages, onPublishMessage, 
       return;
     }
 
-    const result = onPublishMessage(publishTopic, publishPayload);
+    if (!publishTopic) {
+      setPublishStatus({
+        type: 'error',
+        message: 'No topic selected for publishing.',
+      });
+      return;
+    }
+
+    const result = await onPublishMessage(publishTopic, publishPayload);
     setPublishStatus(result);
   };
 
@@ -42,7 +59,7 @@ export default function KafkaExplorerView({ topics, messages, onPublishMessage, 
             <span>Kafka-UI Topic & Partition Explorer</span>
           </h2>
           <p className="text-xs text-gray-400 font-mono mt-0.5">
-            Inspired by provectus/kafka-ui • Real-time offset commit inspect & schema framing
+            Real-time live cluster topic discovery & dynamic route verification
           </p>
         </div>
         <div className="relative">
@@ -63,50 +80,57 @@ export default function KafkaExplorerView({ topics, messages, onPublishMessage, 
         <div className="rounded-2xl border border-white/10 bg-white/[0.02] overflow-hidden lg:col-span-1">
           <div className="p-4 border-b border-white/10 bg-white/[0.02] flex items-center justify-between">
             <span className="text-xs font-medium font-mono text-gray-300 uppercase">Registered Topics ({topics.length})</span>
-            <span className="text-[11px] font-mono text-gray-400">22 Partitions Total</span>
+            <span className="text-[11px] font-mono text-gray-400">Live Policy Engine</span>
           </div>
           <div className="overflow-x-auto max-h-[550px] overflow-y-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-black/60 border-b border-white/5 font-mono text-[11px] text-gray-400">
-                <tr>
-                  <th className="py-3 px-3">Topic</th>
-                  <th className="py-3 px-3">Parts</th>
-                  <th className="py-3 px-3">Jurisdiction</th>
-                  <th className="py-3 px-3">Messages</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5 font-mono">
-                {filteredTopics.map((t) => {
-                  const isSelected = selectedTopic.name === t.name;
-                  let badge = 'bg-white/5 text-gray-300 border-white/10';
-                  if (t.legalRegion === 'Germany') badge = 'bg-purple-500/10 text-purple-300 border-purple-500/20';
-                  if (t.legalRegion === 'India') badge = 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20';
+            {filteredTopics.length === 0 ? (
+              <div className="p-8 text-center text-gray-500 font-mono text-xs">
+                {topics.length === 0 ? 'Connecting to live policy engine...' : 'No matching topics found.'}
+              </div>
+            ) : (
+              <table className="w-full text-left text-xs">
+                <thead className="bg-black/60 border-b border-white/5 font-mono text-[11px] text-gray-400">
+                  <tr>
+                    <th className="py-3 px-3">Topic</th>
+                    <th className="py-3 px-3">Parts</th>
+                    <th className="py-3 px-3">Jurisdiction</th>
+                    <th className="py-3 px-3">Messages</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 font-mono">
+                  {filteredTopics.map((t) => {
+                    const isSelected = selectedTopic?.name === t.name;
+                    let badge = 'bg-white/5 text-gray-300 border-white/10';
+                    if (t.legalRegion === 'Germany') badge = 'bg-purple-500/10 text-purple-300 border-purple-500/20';
+                    if (t.legalRegion === 'India') badge = 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20';
+                    if (t.legalRegion === 'Singapore') badge = 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20';
 
-                  return (
-                    <tr
-                      key={t.name}
-                      onClick={() => setSelectedTopic(t)}
-                      className={`hover:bg-white/[0.04] cursor-pointer transition ${
-                        isSelected ? 'bg-white/[0.06] border-l-2 border-l-white' : ''
-                      }`}
-                    >
-                      <td className="py-3 px-3 font-medium text-white flex items-center gap-1.5">
-                        <span className="text-gray-500">#</span> {t.name}
-                      </td>
-                      <td className="py-3 px-3 text-gray-300">{t.partitions}</td>
-                      <td className="py-3 px-3">
-                        <span className={`text-[10px] px-2 py-0.5 rounded border ${badge}`}>
-                          {t.legalRegion}
-                        </span>
-                      </td>
-                      <td className="py-3 px-3 text-gray-300 font-medium">
-                        {(t.messagesTotal ?? messages.filter((m) => m.topic === t.name).length).toLocaleString()}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                    return (
+                      <tr
+                        key={t.name}
+                        onClick={() => setSelectedTopic(t)}
+                        className={`hover:bg-white/[0.04] cursor-pointer transition ${
+                          isSelected ? 'bg-white/[0.06] border-l-2 border-l-white' : ''
+                        }`}
+                      >
+                        <td className="py-3 px-3 font-medium text-white flex items-center gap-1.5">
+                          <span className="text-gray-500">#</span> {t.name}
+                        </td>
+                        <td className="py-3 px-3 text-gray-300">{t.partitions}</td>
+                        <td className="py-3 px-3">
+                          <span className={`text-[10px] px-2 py-0.5 rounded border ${badge}`}>
+                            {t.legalRegion}
+                          </span>
+                        </td>
+                        <td className="py-3 px-3 text-gray-300 font-medium">
+                          {(t.messagesTotal ?? messages.filter((m) => m.topic === t.name).length).toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
 
@@ -116,14 +140,16 @@ export default function KafkaExplorerView({ topics, messages, onPublishMessage, 
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-mono text-gray-400">Topic Inspector</div>
-                <h3 className="text-lg font-medium font-mono text-white mt-0.5">{selectedTopic.name}</h3>
+                <h3 className="text-lg font-medium font-mono text-white mt-0.5">
+                  {selectedTopic ? selectedTopic.name : 'Select a Topic'}
+                </h3>
                 <div className="text-xs font-mono text-purple-300 mt-1 flex items-center gap-1.5">
-                  <span>🛡️</span> <span>{selectedTopic.compliance}</span>
+                  <span>🛡️</span> <span>{selectedTopic?.compliance || 'Awaiting live topic selection'}</span>
                 </div>
               </div>
               <div className="text-right">
                 <span className="text-xs font-mono bg-white/5 text-gray-300 px-3 py-1 rounded-full border border-white/10">
-                  {selectedTopic.partitions} Partitions (RingBuffer FIFO)
+                  {selectedTopic?.partitions || 0} Partitions (RingBuffer FIFO)
                 </span>
               </div>
             </div>
@@ -140,7 +166,7 @@ export default function KafkaExplorerView({ topics, messages, onPublishMessage, 
             <div className="max-h-72 overflow-y-auto divide-y divide-white/5">
               {topicMessages.length === 0 ? (
                 <div className="p-8 text-center text-gray-500 font-mono text-xs">
-                  No retained messages in partition for topic '{selectedTopic.name}'.
+                  {selectedTopic ? `No messages recorded yet for '${selectedTopic.name}'.` : 'Select a topic to view its commit log.'}
                 </div>
               ) : (
                 topicMessages.map((msg) => (
