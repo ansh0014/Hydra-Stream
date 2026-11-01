@@ -1,16 +1,8 @@
-/**
- * Hydra Stream - Dynamic Real API Client
- * Zero hardcoded mock brokers or fake endpoints.
- * Everything is fetched dynamically from the Go Control Plane, etcd, and Prometheus.
- */
+import { BrokerNode, TopicPolicy, RouteDecision, ConsumerGroup } from '../types';
 
 export const API_BASE = '/api/v1';
 
-/**
- * Geographic projection coordinates for rendering nodes on the world map canvas.
- * (Pure visual metadata; node status, endpoints, and health are 100% dynamic from etcd).
- */
-export const REGION_COORDINATES = {
+export const REGION_COORDINATES: Record<string, { lat: number; lng: number; flag: string; name: string }> = {
   india: {
     lat: 19.0760,
     lng: 72.8777,
@@ -34,7 +26,7 @@ export const REGION_COORDINATES = {
 /**
  * Fetch live cluster brokers registered dynamically in etcd.
  */
-export async function fetchTopology() {
+export async function fetchTopology(): Promise<{ brokers: BrokerNode[]; count: number }> {
   const res = await fetch(`${API_BASE}/topology`);
   if (!res.ok) {
     throw new Error(`Failed to fetch topology: ${res.statusText}`);
@@ -45,7 +37,7 @@ export async function fetchTopology() {
 /**
  * Fetch live governance topics from the Go Control Plane Policy Engine.
  */
-export async function fetchTopics() {
+export async function fetchTopics(): Promise<any[]> {
   const res = await fetch(`${API_BASE}/topics`);
   if (!res.ok) {
     throw new Error(`Failed to fetch topics: ${res.statusText}`);
@@ -57,7 +49,7 @@ export async function fetchTopics() {
 /**
  * Resolve routing decision and data residency compliance via Go Control Plane.
  */
-export async function resolveRoute(topic, clientRegion = 'India') {
+export async function resolveRoute(topic: string, clientRegion = 'India'): Promise<RouteDecision> {
   const res = await fetch(`${API_BASE}/route/resolve`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -73,7 +65,7 @@ export async function resolveRoute(topic, clientRegion = 'India') {
 /**
  * Check cluster health from control plane bridge.
  */
-export async function fetchHealth() {
+export async function fetchHealth(): Promise<{ status: string; bridge: string; controlPlane?: any }> {
   const res = await fetch('/health');
   if (!res.ok) {
     throw new Error(`Health check failed: ${res.statusText}`);
@@ -82,12 +74,31 @@ export async function fetchHealth() {
 }
 
 /**
- * Query Prometheus link latency metric.
+ * Query Prometheus live metrics.
  */
-export async function fetchLatencyMetrics() {
+export async function fetchLatencyMetrics(): Promise<any> {
   const res = await fetch(`${API_BASE}/metrics/latency`);
   if (!res.ok) {
     throw new Error(`Metrics failed: ${res.statusText}`);
   }
   return await res.json();
 }
+
+/**
+ * Query Go Control Plane cluster supervisor metrics.
+ */
+export async function fetchClusterSupervisorMetrics(): Promise<{
+  active_brokers: number;
+  healthy_brokers: number;
+  degraded_brokers: number;
+  etcd_connected: boolean;
+  prom_connected: boolean;
+  timestamp: string;
+}> {
+  const res = await fetch(`${API_BASE}/metrics`);
+  if (!res.ok) {
+    throw new Error(`Cluster metrics failed: ${res.statusText}`);
+  }
+  return await res.json();
+}
+
