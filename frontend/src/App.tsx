@@ -14,6 +14,39 @@ import {
 } from './services/api';
 import { BrokerNode, TopicPolicy, PartitionCommitLog, TelemetryEvent } from './types';
 
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Hydra View Error:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="max-w-xl mx-auto my-32 p-8 rounded-2xl border border-cyan-500/20 bg-black/80 text-center font-mono space-y-4">
+          <div className="text-cyan-400 font-semibold text-base">Dashboard View Error Intercepted</div>
+          <p className="text-xs text-gray-400">{this.state.error?.message || 'Unexpected view exception.'}</p>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="px-4 py-2 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-xs font-medium hover:bg-cyan-500/30 transition"
+          >
+            Recover & Reload View
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('landing');
   const [regions, setRegions] = useState<Record<string, BrokerNode>>({});
@@ -65,7 +98,7 @@ export default function App() {
           const meta = REGION_COORDINATES[regKey] || {
             lat: 0,
             lng: 0,
-            flag: '[GL]',
+            flag: '🌐',
             name: b.region
           };
           next[regKey] = {
@@ -279,6 +312,7 @@ export default function App() {
       />
 
       <main className="flex-1">
+        <ErrorBoundary>
         {activeTab === 'landing' && (
           <LandingView
             setActiveTab={setActiveTab}
@@ -335,6 +369,7 @@ export default function App() {
             gdprPrevented={gdprPrevented}
           />
         )}
+              </ErrorBoundary>
       </main>
 
       <footer className="border-t border-white/5 bg-[#05070a] py-6 text-center text-xs font-mono text-gray-500">

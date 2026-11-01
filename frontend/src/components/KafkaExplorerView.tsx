@@ -14,7 +14,8 @@ import {
   Copy,
   ChevronRight,
   Database,
-  ArrowUpRight
+  ArrowUpRight,
+  ShieldCheck
 } from 'lucide-react';
 import { TopicPolicy, PartitionCommitLog, ConsumerGroup } from '../types';
 
@@ -621,7 +622,7 @@ export default function KafkaExplorerView({
 
                 <button
                   onClick={() => loadPresetPayload('upi')}
-                  className="w-full text-left p-3 rounded-xl border border-cyan-500/20 bg-emerald-500/[0.04] hover:bg-emerald-500/[0.08] transition font-mono text-xs"
+                  className="w-full text-left p-3 rounded-xl border border-cyan-500/20 bg-cyan-500/[0.04] hover:bg-cyan-500/[0.08] transition font-mono text-xs"
                 >
                   <div className="font-semibold text-cyan-300 flex items-center justify-between">
                     <span>RBI UPI Banking Settlement</span>

@@ -157,17 +157,17 @@ interface TopologyViewProps {
 }
 
 export default function TopologyView({
-  regions,
-  clusterHealth,
-  throughput,
-  totalMessages,
-  gdprPrevented,
-  activeChaos,
-  events,
-  onInjectSlowLink,
-  onInjectBlackout,
-  onInjectBurst,
-  onRestore,
+  regions = {},
+  clusterHealth = 'HEALTHY',
+  throughput = 0,
+  totalMessages = 0,
+  gdprPrevented = 0,
+  activeChaos = null,
+  events = [],
+  onInjectSlowLink = () => {},
+  onInjectBlackout = () => {},
+  onInjectBurst = () => {},
+  onRestore = () => {},
 }: TopologyViewProps) {
   const [viewMode, setViewMode] = useState<'map' | 'xyflow'>('map');
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -742,7 +742,7 @@ export default function TopologyView({
         <div className="p-5 rounded-2xl border border-white/10 bg-white/[0.02]">
           <div className="text-[11px] font-mono text-gray-400 uppercase tracking-wider">Pipeline Throughput</div>
           <div className="text-3xl font-medium text-white mt-2 font-mono flex items-baseline gap-2">
-            {throughput > 0 ? throughput.toLocaleString() : '309,597'}{' '}
+            {(throughput || 0) > 0 ? (throughput || 0).toLocaleString() : '309,597'}{' '}
             <span className="text-xs font-normal text-gray-400">msg/sec</span>
           </div>
           <div className="text-[11px] text-gray-400 font-mono mt-1">
@@ -753,7 +753,7 @@ export default function TopologyView({
         <div className="p-5 rounded-2xl border border-white/10 bg-white/[0.02]">
           <div className="text-[11px] font-mono text-gray-400 uppercase tracking-wider">Messages Streamed</div>
           <div className="text-3xl font-medium text-white mt-2 font-mono flex items-baseline gap-2">
-            {totalMessages.toLocaleString()}
+            {(totalMessages || 0).toLocaleString()}
           </div>
           <div className="text-[11px] text-purple-300 font-mono mt-1">
             Monotonic Offsets Synced
