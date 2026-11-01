@@ -5,7 +5,6 @@ import TopologyView from './components/TopologyView';
 import KafkaExplorerView from './components/KafkaExplorerView';
 import ChaosStudioView from './components/ChaosStudioView';
 import ComplianceVaultView from './components/ComplianceVaultView';
-import CursorFollower from './components/CursorFollower';
 import {
   REGION_COORDINATES,
   fetchTopology,
@@ -66,7 +65,7 @@ export default function App() {
           const meta = REGION_COORDINATES[regKey] || {
             lat: 0,
             lng: 0,
-            flag: '🌐',
+            flag: '[GL]',
             name: b.region
           };
           next[regKey] = {
@@ -270,7 +269,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen kafka-mesh-bg text-white flex flex-col font-sans selection:bg-cyan-400 selection:text-black relative">
-      <CursorFollower />
       <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}

@@ -96,10 +96,10 @@ export default function Header({
       case 'HEALTHY':
       default:
         return (
-          <div className="h-[30px] px-2.5 rounded-full bg-emerald-500/[0.08] border border-emerald-500/30 text-emerald-400 flex items-center gap-2 select-none shadow-[0_0_12px_rgba(52,211,153,0.12)] shrink-0">
+          <div className="h-[30px] px-2.5 rounded-full bg-cyan-500/[0.08] border border-cyan-500/30 text-cyan-400 flex items-center gap-2 select-none shadow-[0_0_12px_rgba(6,182,212,0.15)] shrink-0">
             <span className="relative flex h-1.5 w-1.5 shrink-0">
-              <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-400"></span>
+              <span className="animate-pulse absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-cyan-400"></span>
             </span>
             <span className="text-[10.5px] xl:text-[11px] font-mono font-medium tracking-wide uppercase whitespace-nowrap">
               CLUSTER HEALTHY

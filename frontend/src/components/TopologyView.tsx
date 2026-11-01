@@ -277,9 +277,9 @@ export default function TopologyView({
       ctx.restore();
 
       // Fallback node coords if dynamic backend not loaded yet
-      const deCoord: BrokerNode = regions.germany || { id: 'broker-germany-1', region: 'Germany', endpoint: ':9093', rtt: 85, lat: 50.1109, lng: 8.6821, status: 'HEALTHY', flag: '🇩🇪', name: 'Germany (Frankfurt)' };
-      const inCoord: BrokerNode = regions.india || { id: 'broker-india-1', region: 'India', endpoint: ':9092', rtt: 40, lat: 19.0760, lng: 72.8777, status: 'HEALTHY', flag: '🇮🇳', name: 'India (Mumbai)' };
-      const sgCoord: BrokerNode = regions.singapore || { id: 'broker-singapore-1', region: 'Singapore', endpoint: ':9094', rtt: 120, lat: 1.3521, lng: 103.8198, status: 'HEALTHY', flag: '🇸🇬', name: 'Singapore (Changi)' };
+            const deCoord: BrokerNode = regions.germany || { id: 'broker-germany-1', region: 'Germany', endpoint: 'broker-germany:9093', rtt: 0, lat: 50.1109, lng: 8.6821, status: 'HEALTHY', flag: '', name: 'Germany (Frankfurt)' };
+      const inCoord: BrokerNode = regions.india || { id: 'broker-india-1', region: 'India', endpoint: 'broker-india:9092', rtt: 0, lat: 19.0760, lng: 72.8777, status: 'HEALTHY', flag: '', name: 'India (Mumbai)' };
+      const sgCoord: BrokerNode = regions.singapore || { id: 'broker-singapore-1', region: 'Singapore', endpoint: 'broker-singapore:9094', rtt: 0, lat: 1.3521, lng: 103.8198, status: 'HEALTHY', flag: '', name: 'Singapore (Changi)' };
 
       const nodePos: Record<string, { x: number; y: number }> = {
         germany: geoToCanvas(deCoord.lat || 50.1109, deCoord.lng || 8.6821, w, h),
@@ -483,7 +483,7 @@ export default function TopologyView({
         ctx.font = '600 11px Poppins, sans-serif';
         ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'center';
-        ctx.fillText(`${reg.flag || '🌐'} ${(reg.name || key).split(' ')[0]}`, node.x, node.y + 20);
+        ctx.fillText(`[${key.substring(0, 2).toUpperCase()}] ${(reg.name || key).split(' ')[0]}`, node.x, node.y + 20);
 
         ctx.font = '10px "JetBrains Mono", monospace';
         ctx.fillStyle = reg.status === 'HEALTHY' ? '#9ca3af' : coreColor;
@@ -492,7 +492,7 @@ export default function TopologyView({
         if (key === 'germany') {
           ctx.fillStyle = '#c084fc';
           ctx.font = '9px "JetBrains Mono", monospace';
-          ctx.fillText('🛡️ EU GDPR SOVEREIGN LOCK', node.x, node.y - 14);
+          ctx.fillText('EU GDPR SOVEREIGN LOCK', node.x, node.y - 14);
         }
 
         ctx.restore();
@@ -512,102 +512,121 @@ export default function TopologyView({
   // @xyflow/react Interactive Topology Node Graph
   const { initialNodes, initialEdges } = useMemo(() => {
     const nodes: Node[] = [
-      // Control & Gateway tier
+      // Ingress Gateway
       {
         id: 'envoy-gateway',
-        position: { x: 380, y: 30 },
-        data: { label: 'Envoy L4 Proxy Gateway (:9000)' },
+        position: { x: 380, y: 20 },
+        data: {
+          label: 'Envoy L4 Proxy Gateway\nDynamic Latency Scoring',
+        },
         style: {
-          background: '#0a0d14',
+          background: '#0a0d16',
           color: '#ffffff',
-          border: '1px solid rgba(255,255,255,0.2)',
+          border: '1px solid rgba(6, 182, 212, 0.4)',
           borderRadius: 12,
-          padding: 12,
+          padding: '12px 16px',
           fontSize: 12,
           fontFamily: 'JetBrains Mono',
-          width: 250,
+          width: 260,
+          textAlign: 'center',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
         },
       },
-      {
-        id: 'hydra-controller',
-        position: { x: 80, y: 160 },
-        data: { label: 'Go Control Plane (:8080)' },
-        style: {
-          background: '#0a0d14',
-          color: '#38bdf8',
-          border: '1px solid rgba(56,189,248,0.3)',
-          borderRadius: 12,
-          padding: 12,
-          fontSize: 12,
-          fontFamily: 'JetBrains Mono',
-          width: 210,
-        },
-      },
-      {
-        id: 'etcd-registry',
-        position: { x: 80, y: 300 },
-        data: { label: 'etcd v3 Dynamic Discovery' },
-        style: {
-          background: '#0a0d14',
-          color: '#34d399',
-          border: '1px solid rgba(52,211,153,0.3)',
-          borderRadius: 12,
-          padding: 12,
-          fontSize: 12,
-          fontFamily: 'JetBrains Mono',
-          width: 210,
-        },
-      },
-      // Regional Brokers Tier
+      // Regional Brokers Tier (Horizontal layout)
       {
         id: 'broker-germany',
-        position: { x: 420, y: 180 },
+        position: { x: 60, y: 160 },
         data: {
-          label: `🇩🇪 broker-germany-1\n:9093 • ${regions.germany?.status || 'HEALTHY'}\n🛡️ EU GDPR Sovereign Lock`,
+          label: `[DE] broker-germany-1\n${regions.germany?.status || 'HEALTHY'}\nEU GDPR Sovereign Lock`,
         },
         style: {
           background: regions.germany?.status === 'OFFLINE' ? '#200808' : '#0e0b16',
           color: regions.germany?.status === 'OFFLINE' ? '#f87171' : '#c084fc',
-          border: regions.germany?.status === 'OFFLINE' ? '1px solid #ef4444' : '1px solid rgba(192,132,252,0.4)',
+          border: regions.germany?.status === 'OFFLINE' ? '1px solid #ef4444' : '1px solid rgba(192, 132, 252, 0.4)',
           borderRadius: 12,
-          padding: 14,
+          padding: '12px 14px',
           fontSize: 11,
           fontFamily: 'JetBrains Mono',
           width: 220,
+          textAlign: 'center',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
         },
       },
       {
         id: 'broker-india',
-        position: { x: 420, y: 320 },
+        position: { x: 400, y: 160 },
         data: {
-          label: `🇮🇳 broker-india-1\n:9092 • ${regions.india?.status || 'HEALTHY'}\nRBI Domestic Sovereign Lock`,
+          label: `[IN] broker-india-1\n${regions.india?.status || 'HEALTHY'}\nRBI Domestic Sovereign Lock`,
         },
         style: {
-          background: regions.india?.status === 'DEGRADED' ? '#1f1505' : '#06130d',
-          color: regions.india?.status === 'DEGRADED' ? '#fbbf24' : '#34d399',
-          border: regions.india?.status === 'DEGRADED' ? '1px solid #f59e0b' : '1px solid rgba(52,211,153,0.4)',
+          background: regions.india?.status === 'DEGRADED' ? '#1f1505' : '#08131d',
+          color: regions.india?.status === 'DEGRADED' ? '#fbbf24' : '#38bdf8',
+          border: regions.india?.status === 'DEGRADED' ? '1px solid #f59e0b' : '1px solid rgba(56, 189, 248, 0.4)',
           borderRadius: 12,
-          padding: 14,
+          padding: '12px 14px',
           fontSize: 11,
           fontFamily: 'JetBrains Mono',
           width: 220,
+          textAlign: 'center',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
         },
       },
       {
         id: 'broker-singapore',
-        position: { x: 720, y: 250 },
+        position: { x: 740, y: 160 },
         data: {
-          label: `🇸🇬 broker-singapore-1\n:9094 • ${regions.singapore?.status || 'HEALTHY'}\nAPAC Fast-Path Fallback`,
+          label: `[SG] broker-singapore-1\n${regions.singapore?.status || 'HEALTHY'}\nAPAC Fast-Path Transit`,
         },
         style: {
           background: '#050f16',
           color: '#38bdf8',
-          border: '1px solid rgba(56,189,248,0.4)',
+          border: '1px solid rgba(56, 189, 248, 0.4)',
           borderRadius: 12,
-          padding: 14,
+          padding: '12px 14px',
           fontSize: 11,
           fontFamily: 'JetBrains Mono',
           width: 220,
+          textAlign: 'center',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+        },
+      },
+      // Control & Discovery Tier (Bottom)
+      {
+        id: 'hydra-controller',
+        position: { x: 230, y: 310 },
+        data: {
+          label: 'Go Sovereign Control Plane\nPolicy & Routing Engine',
+        },
+        style: {
+          background: '#090d14',
+          color: '#38bdf8',
+          border: '1px solid rgba(56, 189, 248, 0.3)',
+          borderRadius: 12,
+          padding: '12px 14px',
+          fontSize: 11,
+          fontFamily: 'JetBrains Mono',
+          width: 230,
+          textAlign: 'center',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+        },
+      },
+      {
+        id: 'etcd-registry',
+        position: { x: 570, y: 310 },
+        data: {
+          label: 'etcd v3 Dynamic Discovery\nCluster Raft Topology',
+        },
+        style: {
+          background: '#08131d',
+          color: '#38bdf8',
+          border: '1px solid rgba(129, 140, 248, 0.4)',
+          borderRadius: 12,
+          padding: '12px 14px',
+          fontSize: 11,
+          fontFamily: 'JetBrains Mono',
+          width: 230,
+          textAlign: 'center',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
         },
       },
     ];
@@ -618,6 +637,7 @@ export default function TopologyView({
         source: 'envoy-gateway',
         target: 'broker-germany',
         animated: regions.germany?.status !== 'OFFLINE',
+        type: 'smoothstep',
         style: { stroke: regions.germany?.status === 'OFFLINE' ? '#ef4444' : '#a855f7', strokeWidth: 2 },
       },
       {
@@ -625,50 +645,46 @@ export default function TopologyView({
         source: 'envoy-gateway',
         target: 'broker-india',
         animated: true,
-        style: { stroke: regions.india?.status === 'DEGRADED' ? '#f59e0b' : '#10b981', strokeWidth: 2 },
+        type: 'smoothstep',
+        style: { stroke: regions.india?.status === 'DEGRADED' ? '#f59e0b' : '#38bdf8', strokeWidth: 2 },
       },
       {
         id: 'e-gw-sg',
         source: 'envoy-gateway',
         target: 'broker-singapore',
         animated: true,
+        type: 'smoothstep',
         style: { stroke: '#06b6d4', strokeWidth: 2 },
+      },
+      {
+        id: 'e-de-in',
+        source: 'broker-germany',
+        target: 'broker-india',
+        type: 'straight',
+        style: { stroke: '#334155', strokeDasharray: '4 4' },
+      },
+      {
+        id: 'e-in-sg',
+        source: 'broker-india',
+        target: 'broker-singapore',
+        type: 'straight',
+        style: { stroke: '#334155', strokeDasharray: '4 4' },
       },
       {
         id: 'e-cp-etcd',
         source: 'hydra-controller',
         target: 'etcd-registry',
-        animated: true,
+        type: 'straight',
         style: { stroke: '#64748b', strokeDasharray: '4 4' },
       },
       {
         id: 'e-etcd-in',
         source: 'etcd-registry',
         target: 'broker-india',
-        style: { stroke: '#334155' },
-      },
-      {
-        id: 'e-etcd-de',
-        source: 'etcd-registry',
-        target: 'broker-germany',
-        style: { stroke: '#334155' },
-      },
-      {
-        id: 'e-in-sg',
-        source: 'broker-india',
-        target: 'broker-singapore',
-        animated: true,
-        style: { stroke: '#0284c7', strokeWidth: 1.5 },
-      },
-      {
-        id: 'e-de-sg',
-        source: 'broker-germany',
-        target: 'broker-singapore',
-        animated: regions.germany?.status !== 'OFFLINE',
-        style: { stroke: regions.germany?.status === 'OFFLINE' ? '#ef4444' : '#8b5cf6', strokeWidth: 1.5 },
+        type: 'smoothstep',
+        style: { stroke: '#1e293b' },
       },
     ];
-
     return { initialNodes: nodes, initialEdges: edges };
   }, [regions]);
 
@@ -718,8 +734,8 @@ export default function TopologyView({
           <div className="text-3xl font-medium text-white mt-2 font-mono flex items-baseline gap-2">
             0.20 <span className="text-xs font-normal text-gray-400">µs (200 ns P50)</span>
           </div>
-          <div className="text-[11px] text-emerald-400 font-mono mt-1">
-            ⚡ RingBuffer Engine
+          <div className="text-[11px] text-cyan-400 font-mono mt-1">
+            RingBuffer Engine
           </div>
         </div>
 
@@ -740,17 +756,17 @@ export default function TopologyView({
             {totalMessages.toLocaleString()}
           </div>
           <div className="text-[11px] text-purple-300 font-mono mt-1">
-            ✔ Monotonic Offsets Synced
+            Monotonic Offsets Synced
           </div>
         </div>
 
         <div className="p-5 rounded-2xl border border-white/10 bg-white/[0.02]">
           <div className="text-[11px] font-mono text-gray-400 uppercase tracking-wider">GDPR Leaks Prevented</div>
-          <div className="text-3xl font-medium text-emerald-400 mt-2 font-mono flex items-baseline gap-2">
+          <div className="text-3xl font-medium text-cyan-400 mt-2 font-mono flex items-baseline gap-2">
             {gdprPrevented} Prevented
           </div>
-          <div className="text-[11px] text-emerald-400 font-mono mt-1">
-            🛡️ Article 44 Enforced
+          <div className="text-[11px] text-cyan-400 font-mono mt-1">
+            Article 44 Enforced
           </div>
         </div>
       </div>
@@ -760,7 +776,7 @@ export default function TopologyView({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
             <h2 className="text-lg font-medium text-white flex items-center gap-2">
-              <span>🌐</span> Global Sovereign Topology & Network Mesh
+              <Globe size={18} className="text-white inline" /> Global Sovereign Topology & Network Mesh
             </h2>
             <p className="text-xs text-gray-400 font-mono mt-0.5">
               Multi-Region Ingress, Dynamic Discovery via etcd, and Prometheus Telemetry
@@ -810,11 +826,7 @@ export default function TopologyView({
             >
               <Background color="#1e293b" gap={20} size={1} />
               <Controls className="bg-black border border-white/10 text-white fill-white" />
-              <MiniMap
-                nodeColor={(n) => (n.id.includes('germany') ? '#c084fc' : n.id.includes('india') ? '#34d399' : '#38bdf8')}
-                className="bg-black/80 border border-white/10 rounded-lg"
-              />
-            </ReactFlow>
+                          </ReactFlow>
           </div>
         )}
       </div>
@@ -895,17 +907,17 @@ export default function TopologyView({
 
           <button
             onClick={onRestore}
-            className="text-left p-5 rounded-xl border border-white/10 bg-white/[0.02] hover:border-emerald-500/50 hover:bg-emerald-500/[0.04] transition-all"
+            className="text-left p-5 rounded-xl border border-white/10 bg-white/[0.02] hover:border-cyan-500/50 hover:bg-emerald-500/[0.04] transition-all"
           >
             <div className="flex items-center justify-between mb-2">
-              <RefreshCw className="text-emerald-400" size={20} />
-              <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded">
+              <RefreshCw className="text-cyan-400" size={20} />
+              <span className="text-[10px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 px-2 py-0.5 rounded">
                 Self-Heal
               </span>
             </div>
             <div className="text-sm font-medium text-white">Restore Normal State</div>
             <p className="text-[11px] text-gray-400 font-mono mt-1 leading-relaxed">
-              Flush Linux netem rules, restore etcd leases, and return all brokers to optimal green health.
+              Flush Linux netem rules, restore etcd leases, and return all brokers to optimal cluster health.
             </p>
           </button>
         </div>
@@ -923,7 +935,7 @@ export default function TopologyView({
             rtt: key === 'india' ? 10 : key === 'germany' ? 85 : 40,
             storage: 'Embedded RocksDB (C++17)',
             boundTopics: key === 'india' ? ['upi-transactions', 'orders-india'] : key === 'germany' ? ['gdpr-user-audit', 'eu-payments'] : ['apac-fx', 'global-telemetry'],
-            flag: key === 'india' ? '🇮🇳' : key === 'germany' ? '🇩🇪' : '🇸🇬',
+            flag: '',
           };
 
           let borderClass = 'border-white/10';
@@ -942,7 +954,7 @@ export default function TopologyView({
               <div className="flex items-start justify-between">
                 <div>
                   <div className="text-xs font-mono text-gray-400 font-medium flex items-center gap-1.5">
-                    <span>{reg.flag}</span> REGION: {key.toUpperCase()}
+                    <span>[{key.substring(0, 2).toUpperCase()}]</span> REGION: {key.toUpperCase()}
                   </div>
                   <h4 className="text-lg font-medium text-white mt-1">{reg.id}</h4>
                   <p className="text-xs text-gray-400 font-mono">TCP :{reg.endpoint?.split(':')[1] || '9092'} • Health :{reg.healthPort || '8081'}</p>

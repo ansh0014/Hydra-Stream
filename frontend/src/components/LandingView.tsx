@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight, ArrowUpRight, Shield, Zap, Globe, Cpu, Check, Activity, Server, AlertCircle } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Shield, Zap, Globe, Cpu, Check, Activity, Server, AlertCircle, WifiOff, PowerOff, Scale } from 'lucide-react';
 import { motion } from 'motion/react';
 import { BrokerNode } from '../types';
 
@@ -33,7 +33,7 @@ export default function LandingView({
         onClick={() => setActiveTab('topology')}
       >
         <span className="text-xs text-center whitespace-nowrap text-gray-300">
-          ✨ Sovereign Geo-Resilient Mesh v1.2 is live!
+          Sovereign Geo-Resilient Mesh v1.2 is live!
         </span>
         <span className="flex items-center gap-1 text-xs text-white hover:underline transition-all whitespace-nowrap font-medium">
           Open Live Console
@@ -123,11 +123,11 @@ export default function LandingView({
             <div className="flex items-center space-x-2">
               <span className="w-3 h-3 rounded-full bg-red-500/80"></span>
               <span className="w-3 h-3 rounded-full bg-yellow-500/80"></span>
-              <span className="w-3 h-3 rounded-full bg-green-500/80"></span>
+              <span className="w-3 h-3 rounded-full bg-cyan-500/80"></span>
               <span className="ml-3 text-xs font-mono text-gray-400">hydra-cluster://sovereign-mesh.internal</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                 Quorum Synchronized
               </span>
@@ -142,7 +142,7 @@ export default function LandingView({
             <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
               <div className="text-[10px] font-mono text-gray-400 uppercase">Core P50 Latency</div>
               <div className="text-xl font-semibold text-white mt-1 font-mono">0.20 µs</div>
-              <div className="text-[10px] text-emerald-400 font-mono mt-0.5">200 ns RingBuffer</div>
+              <div className="text-[10px] text-cyan-400 font-mono mt-0.5">200 ns RingBuffer</div>
             </div>
 
             <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
@@ -158,18 +158,18 @@ export default function LandingView({
               <div className="text-xl font-semibold text-white mt-1 font-mono">
                 {activeBrokerCount} / {totalBrokerCount}
               </div>
-              <div className="text-[10px] text-emerald-400 font-mono mt-0.5">etcd v3 Dynamic</div>
+              <div className="text-[10px] text-cyan-400 font-mono mt-0.5">etcd v3 Dynamic</div>
             </div>
 
             <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
               <div className="text-[10px] font-mono text-gray-400 uppercase">Consumer Lag</div>
               <div className="text-xl font-semibold text-white mt-1 font-mono">0 msgs</div>
-              <div className="text-[10px] text-emerald-400 font-mono mt-0.5">Zero Backlog Delay</div>
+              <div className="text-[10px] text-cyan-400 font-mono mt-0.5">Zero Backlog Delay</div>
             </div>
 
             <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
               <div className="text-[10px] font-mono text-gray-400 uppercase">Residency Leaks</div>
-              <div className="text-xl font-semibold text-emerald-400 mt-1 font-mono">0 Bytes</div>
+              <div className="text-xl font-semibold text-cyan-400 mt-1 font-mono">0 Bytes</div>
               <div className="text-[10px] text-purple-300 font-mono mt-0.5">{gdprPrevented} Prevented</div>
             </div>
 
@@ -212,8 +212,8 @@ export default function LandingView({
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-white/25 transition-all">
-            <div className="h-10 w-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white text-lg mb-5">
-              🌊
+            <div className="h-10 w-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mb-5">
+              <WifiOff className="text-cyan-400" size={20} />
             </div>
             <h3 className="text-lg font-medium text-white mb-2">Undersea Fiber Cuts</h3>
             <p className="text-xs text-gray-400 leading-relaxed mb-4">
@@ -225,8 +225,8 @@ export default function LandingView({
           </div>
 
           <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-white/25 transition-all">
-            <div className="h-10 w-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white text-lg mb-5">
-              🛑
+            <div className="h-10 w-10 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mb-5">
+              <PowerOff className="text-rose-400" size={20} />
             </div>
             <h3 className="text-lg font-medium text-white mb-2">Regional Blackouts</h3>
             <p className="text-xs text-gray-400 leading-relaxed mb-4">
@@ -238,8 +238,8 @@ export default function LandingView({
           </div>
 
           <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-white/25 transition-all">
-            <div className="h-10 w-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white text-lg mb-5">
-              ⚖️
+            <div className="h-10 w-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mb-5">
+              <Scale className="text-purple-400" size={20} />
             </div>
             <h3 className="text-lg font-medium text-white mb-2">€20M GDPR Penalties</h3>
             <p className="text-xs text-gray-400 leading-relaxed mb-4">
@@ -272,7 +272,7 @@ export default function LandingView({
                   <th className="py-3 px-4 font-medium">Capability</th>
                   <th className="py-3 px-4 font-medium text-white">Hydra Stream (C++17 & Go)</th>
                   <th className="py-3 px-4 font-medium text-gray-400">Apache Kafka (JVM & KRaft)</th>
-                  <th className="py-3 px-4 font-medium text-emerald-400">Enterprise Advantage</th>
+                  <th className="py-3 px-4 font-medium text-cyan-400">Enterprise Advantage</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -280,25 +280,25 @@ export default function LandingView({
                   <td className="py-3.5 px-4 font-semibold text-white">Core Memory Latency</td>
                   <td className="py-3.5 px-4 text-white font-bold">200 ns (0.20 µs P50)</td>
                   <td className="py-3.5 px-4 text-gray-400">5.0 – 15.0 µs</td>
-                  <td className="py-3.5 px-4 text-emerald-400 font-medium">25x – 75x Faster In-Memory</td>
+                  <td className="py-3.5 px-4 text-cyan-400 font-medium">25x – 75x Faster In-Memory</td>
                 </tr>
                 <tr>
                   <td className="py-3.5 px-4 font-semibold text-white">Memory Footprint</td>
                   <td className="py-3.5 px-4 text-white font-bold">~48 MB Native RSS</td>
                   <td className="py-3.5 px-4 text-gray-400">2.0 – 8.0 GB JVM Heap</td>
-                  <td className="py-3.5 px-4 text-emerald-400 font-medium">Zero Garbage Collection Pauses</td>
+                  <td className="py-3.5 px-4 text-cyan-400 font-medium">Zero Garbage Collection Pauses</td>
                 </tr>
                 <tr>
                   <td className="py-3.5 px-4 font-semibold text-white">Cross-Border Geo-Fence</td>
                   <td className="py-3.5 px-4 text-white font-bold">Hardware-Guaranteed 0 Bytes</td>
                   <td className="py-3.5 px-4 text-gray-400">Region-Blind (Manual Scripts)</td>
-                  <td className="py-3.5 px-4 text-emerald-400 font-medium">100% Legal Immunity</td>
+                  <td className="py-3.5 px-4 text-cyan-400 font-medium">100% Legal Immunity</td>
                 </tr>
                 <tr>
                   <td className="py-3.5 px-4 font-semibold text-white">Undersea Cut Failover</td>
                   <td className="py-3.5 px-4 text-white font-bold">&lt; 250 ms Automatic Steering</td>
                   <td className="py-3.5 px-4 text-gray-400">Static Pipeline Freeze</td>
-                  <td className="py-3.5 px-4 text-emerald-400 font-medium">Zero Producer Blocking</td>
+                  <td className="py-3.5 px-4 text-cyan-400 font-medium">Zero Producer Blocking</td>
                 </tr>
               </tbody>
             </table>
@@ -346,10 +346,10 @@ export default function LandingView({
               <h4 className="text-xl font-medium text-white mt-1">Global Mesh Tier</h4>
               <div className="text-3xl font-semibold text-white mt-3 font-mono">$2,400 <span className="text-xs font-normal text-gray-400">/ node / mo</span></div>
               <ul className="mt-5 space-y-2.5 text-xs text-gray-300 font-mono">
-                <li className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> Mathematical GDPR Enforcer</li>
-                <li className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> Linux tc netem Fault Bypass</li>
-                <li className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> Automated Correctness Oracle</li>
-                <li className="flex items-center gap-2"><Check size={14} className="text-emerald-400" /> 24/7 SLA Undersea Rerouting</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-cyan-400" /> Mathematical GDPR Enforcer</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-cyan-400" /> Linux tc netem Fault Bypass</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-cyan-400" /> Automated Correctness Oracle</li>
+                <li className="flex items-center gap-2"><Check size={14} className="text-cyan-400" /> 24/7 SLA Undersea Rerouting</li>
               </ul>
             </div>
             <button 

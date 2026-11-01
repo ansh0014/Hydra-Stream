@@ -6,19 +6,19 @@ export const REGION_COORDINATES: Record<string, { lat: number; lng: number; flag
   india: {
     lat: 19.0760,
     lng: 72.8777,
-    flag: '🇮🇳',
+    flag: '[IN]',
     name: 'India (Mumbai Central)',
   },
   germany: {
     lat: 50.1109,
     lng: 8.6821,
-    flag: '🇩🇪',
+    flag: '[DE]',
     name: 'Germany (Frankfurt EU)',
   },
   singapore: {
     lat: 1.3521,
     lng: 103.8198,
-    flag: '🇸🇬',
+    flag: '[SG]',
     name: 'Singapore (Changi Hub)',
   },
 };

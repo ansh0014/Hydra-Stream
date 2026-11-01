@@ -102,7 +102,7 @@ export default function ChaosStudioView({
         <div className="flex items-center gap-3">
           <button
             onClick={onRestore}
-            className="px-4 py-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 text-xs font-mono transition flex items-center gap-2"
+            className="px-4 py-2 rounded-xl border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 text-xs font-mono transition flex items-center gap-2"
           >
             <RefreshCw size={13} className={activeChaos ? 'animate-spin' : ''} />
             <span>Flush Netem & Heal</span>
@@ -198,17 +198,17 @@ export default function ChaosStudioView({
         {/* Action 4: Restore State */}
         <button
           onClick={onRestore}
-          className="text-left p-5 rounded-2xl border border-white/10 bg-white/[0.02] hover:border-emerald-500/40 hover:bg-emerald-500/[0.03] transition-all group"
+          className="text-left p-5 rounded-2xl border border-white/10 bg-white/[0.02] hover:border-cyan-500/40 hover:bg-emerald-500/[0.03] transition-all group"
         >
           <div className="flex items-center justify-between mb-3">
-            <div className="h-8 w-8 rounded-lg bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-              <RefreshCw className="text-emerald-400" size={16} />
+            <div className="h-8 w-8 rounded-lg bg-cyan-500/15 border border-cyan-500/30 flex items-center justify-center">
+              <RefreshCw className="text-cyan-400" size={16} />
             </div>
-            <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-2 py-0.5 rounded">
+            <span className="text-[10px] font-mono bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 px-2 py-0.5 rounded">
               Self-Heal
             </span>
           </div>
-          <div className="text-sm font-semibold text-white group-hover:text-emerald-300 transition">
+          <div className="text-sm font-semibold text-white group-hover:text-cyan-300 transition">
             Restore Cluster Health
           </div>
           <p className="text-[11px] text-gray-400 font-mono mt-2 leading-relaxed">
@@ -303,15 +303,15 @@ export default function ChaosStudioView({
               <div className="p-4 rounded-xl border border-white/15 bg-black/60 text-xs font-mono text-white space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 size={16} className="text-emerald-400" />
+                    <CheckCircle2 size={16} className="text-cyan-400" />
                     <span className="font-semibold text-white">Route Assigned by Go Control Plane</span>
                   </div>
                   {routeResult.isBypassingSlowLink ? (
                     <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2.5 py-0.5 rounded text-[10px] font-bold animate-pulse">
-                      ⚡ DYNAMIC BYPASS ACTIVE
+                      DYNAMIC BYPASS ACTIVE
                     </span>
                   ) : (
-                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2.5 py-0.5 rounded text-[10px] font-bold">
+                    <span className="bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 px-2.5 py-0.5 rounded text-[10px] font-bold">
                       OPTIMAL DIRECT ROUTE
                     </span>
                   )}
@@ -328,7 +328,7 @@ export default function ChaosStudioView({
                   </div>
                   <div>
                     <span className="text-gray-400 block">Algorithmic Score:</span>
-                    <span className="text-emerald-400 font-bold text-xs">{routeResult.score.toFixed(2)} pts</span>
+                    <span className="text-cyan-400 font-bold text-xs">{routeResult.score.toFixed(2)} pts</span>
                   </div>
                   <div>
                     <span className="text-gray-400 block">Endpoint:</span>
@@ -349,7 +349,7 @@ export default function ChaosStudioView({
       <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-3">
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
             <h3 className="text-sm font-semibold font-mono text-white">
               Controller Routing Decision Stream (events.jsonl trace)
             </h3>
@@ -389,8 +389,8 @@ export default function ChaosStudioView({
                 badge = 'bg-rose-500/10 text-rose-300 border-rose-500/20';
               }
               if (evt.level === 'success') {
-                color = 'text-emerald-300';
-                badge = 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20';
+                color = 'text-cyan-300';
+                badge = 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20';
               }
 
               return (

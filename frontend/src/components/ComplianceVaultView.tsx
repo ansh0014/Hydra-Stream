@@ -122,7 +122,7 @@ export default function ComplianceVaultView({
           <div className="pt-4 border-t border-purple-500/20 space-y-2 text-xs font-mono">
             <div className="flex items-center justify-between text-gray-300">
               <span>Cross-Border Leak:</span>
-              <span className="text-emerald-400 font-bold">0 Bytes</span>
+              <span className="text-cyan-400 font-bold">0 Bytes</span>
             </div>
             <div className="flex items-center justify-between text-gray-300">
               <span>Proactive Rejections:</span>
@@ -132,12 +132,12 @@ export default function ComplianceVaultView({
         </div>
 
         {/* Pillar 2: India RBI */}
-        <div className="rounded-2xl p-6 border border-emerald-500/30 bg-emerald-500/[0.03] space-y-4 relative overflow-hidden">
+        <div className="rounded-2xl p-6 border border-cyan-500/30 bg-emerald-500/[0.03] space-y-4 relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-mono text-emerald-300 font-semibold tracking-wider">
+            <span className="text-xs font-mono text-cyan-300 font-semibold tracking-wider">
               INDIA RBI DIRECTIVE
             </span>
-            <span className="text-[10px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded font-bold">
+            <span className="text-[10px] font-mono bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 px-2 py-0.5 rounded font-bold">
               DOMESTIC ONLY
             </span>
           </div>
@@ -147,14 +147,14 @@ export default function ComplianceVaultView({
             All UPI transaction and banking logs committed directly to local RocksDB storage in Mumbai without foreign replication.
           </p>
 
-          <div className="pt-4 border-t border-emerald-500/20 space-y-2 text-xs font-mono">
+          <div className="pt-4 border-t border-cyan-500/20 space-y-2 text-xs font-mono">
             <div className="flex items-center justify-between text-gray-300">
               <span>Domestic Stash:</span>
-              <span className="text-emerald-400 font-bold">{countFor('upi-transactions')} msgs</span>
+              <span className="text-cyan-400 font-bold">{countFor('upi-transactions')} msgs</span>
             </div>
             <div className="flex items-center justify-between text-gray-300">
               <span>Foreign Sync Blocked:</span>
-              <span className="text-emerald-400 font-bold">100% Enforced</span>
+              <span className="text-cyan-400 font-bold">100% Enforced</span>
             </div>
           </div>
         </div>
@@ -182,7 +182,7 @@ export default function ComplianceVaultView({
             </div>
             <div className="flex items-center justify-between text-gray-300">
               <span>Split-Brain Defense:</span>
-              <span className="text-emerald-400 font-bold">Zero Data Drift</span>
+              <span className="text-cyan-400 font-bold">Zero Data Drift</span>
             </div>
           </div>
         </div>
@@ -227,7 +227,7 @@ export default function ComplianceVaultView({
                 <td className="py-3.5 px-4 text-purple-300 font-bold">0 bytes (100% Locked)</td>
                 <td className="py-3.5 px-4 text-gray-400">DE-FRA-ROCKSDB-01</td>
                 <td className="py-3.5 px-4">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-semibold">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[11px] font-semibold">
                     <CheckCircle2 size={12} />
                     <span>STRICT PASS</span>
                   </span>
@@ -236,12 +236,12 @@ export default function ComplianceVaultView({
 
               <tr className="hover:bg-white/[0.02] transition">
                 <td className="py-3.5 px-4 font-semibold text-white">RBI Domestic Payment</td>
-                <td className="py-3.5 px-4 text-emerald-300">#upi-transactions</td>
+                <td className="py-3.5 px-4 text-cyan-300">#upi-transactions</td>
                 <td className="py-3.5 px-4 text-gray-300">Offset #{countFor('upi-transactions')}</td>
-                <td className="py-3.5 px-4 text-emerald-300 font-bold">0 bytes (Domestic)</td>
+                <td className="py-3.5 px-4 text-cyan-300 font-bold">0 bytes (Domestic)</td>
                 <td className="py-3.5 px-4 text-gray-400">IN-BOM-ROCKSDB-01</td>
                 <td className="py-3.5 px-4">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-semibold">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[11px] font-semibold">
                     <CheckCircle2 size={12} />
                     <span>STRICT PASS</span>
                   </span>
@@ -255,7 +255,7 @@ export default function ComplianceVaultView({
                 <td className="py-3.5 px-4 text-cyan-300 font-bold">0 bytes (Singapore Only)</td>
                 <td className="py-3.5 px-4 text-gray-400">SG-SIN-ROCKSDB-01</td>
                 <td className="py-3.5 px-4">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-semibold">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[11px] font-semibold">
                     <CheckCircle2 size={12} />
                     <span>STRICT PASS</span>
                   </span>

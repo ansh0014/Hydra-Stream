@@ -25,54 +25,7 @@ interface KafkaExplorerViewProps {
   activeRoutes?: Record<string, string>;
 }
 
-// Sample enterprise consumer groups simulating real Kafka consumer group offsets and lag
-const DEFAULT_CONSUMER_GROUPS: ConsumerGroup[] = [
-  {
-    groupId: 'eu-payment-settler-v2',
-    topic: 'eu-payments',
-    state: 'Stable',
-    membersCount: 4,
-    totalLag: 0,
-    assignedBroker: 'broker-germany-1',
-    coordinatorRegion: 'Frankfurt (DE)'
-  },
-  {
-    groupId: 'upi-clearing-engine-prod',
-    topic: 'upi-transactions',
-    state: 'Stable',
-    membersCount: 8,
-    totalLag: 2,
-    assignedBroker: 'broker-india-1',
-    coordinatorRegion: 'Mumbai (IN)'
-  },
-  {
-    groupId: 'apac-hft-risk-monitor',
-    topic: 'apac-fx',
-    state: 'Stable',
-    membersCount: 3,
-    totalLag: 0,
-    assignedBroker: 'broker-singapore-1',
-    coordinatorRegion: 'Singapore (SG)'
-  },
-  {
-    groupId: 'gdpr-compliance-auditor',
-    topic: 'gdpr-user-audit',
-    state: 'Stable',
-    membersCount: 2,
-    totalLag: 0,
-    assignedBroker: 'broker-germany-1',
-    coordinatorRegion: 'Frankfurt (DE)'
-  },
-  {
-    groupId: 'global-timeseries-indexer',
-    topic: 'global-telemetry',
-    state: 'Rebalancing',
-    membersCount: 6,
-    totalLag: 14,
-    assignedBroker: 'broker-singapore-1',
-    coordinatorRegion: 'Global Mesh'
-  }
-];
+
 
 export default function KafkaExplorerView({
   topics = [],
@@ -80,7 +33,7 @@ export default function KafkaExplorerView({
   onPublishMessage,
   activeRoutes = {}
 }: KafkaExplorerViewProps) {
-  const [activeTab, setActiveTab] = useState<'topics' | 'consumer-groups' | 'commit-log' | 'producer'>('topics');
+  const [activeTab, setActiveTab] = useState<'topics' | 'commit-log' | 'producer'>('topics');
   const [selectedTopic, setSelectedTopic] = useState<TopicPolicy | null>(topics[0] || null);
   const [searchTerm, setSearchTerm] = useState('');
   const [publishTopic, setPublishTopic] = useState<string>(topics[0]?.name || 'global-telemetry');
@@ -233,15 +186,6 @@ export default function KafkaExplorerView({
             <span>Topics ({topics.length})</span>
           </button>
           <button
-            onClick={() => setActiveTab('consumer-groups')}
-            className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono transition-all ${
-              activeTab === 'consumer-groups' ? 'bg-white text-black font-semibold shadow-sm' : 'text-gray-400 hover:text-white'
-            }`}
-          >
-            <Users size={13} />
-            <span>Consumer Groups</span>
-          </button>
-          <button
             onClick={() => setActiveTab('commit-log')}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-mono transition-all ${
               activeTab === 'commit-log' ? 'bg-white text-black font-semibold shadow-sm' : 'text-gray-400 hover:text-white'
@@ -295,7 +239,7 @@ export default function KafkaExplorerView({
                   if (t.legalRegion.toLowerCase().includes('germany') || t.legalRegion.toLowerCase().includes('eu'))
                     badge = 'bg-purple-500/10 text-purple-300 border-purple-500/20';
                   if (t.legalRegion.toLowerCase().includes('india'))
-                    badge = 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20';
+                    badge = 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20';
                   if (t.legalRegion.toLowerCase().includes('singapore'))
                     badge = 'bg-cyan-500/10 text-cyan-300 border-cyan-500/20';
 
@@ -330,7 +274,7 @@ export default function KafkaExplorerView({
                         <span className="text-xs font-mono text-gray-300 font-medium">
                           {count} msgs
                         </span>
-                        <div className="text-[10px] font-mono text-emerald-400">
+                        <div className="text-[10px] font-mono text-cyan-400">
                           {activeRoutes[t.name] || 'ACTIVE'}
                         </div>
                       </div>
@@ -358,7 +302,7 @@ export default function KafkaExplorerView({
                         {selectedTopic.name}
                       </h3>
                       <div className="text-xs font-mono text-purple-300 mt-1 flex items-center gap-1.5">
-                        <span>🛡️</span>
+                        <ShieldCheck size={14} className="text-purple-300" />
                         <span>{selectedTopic.compliance || `Jurisdiction: ${selectedTopic.legalRegion}`}</span>
                       </div>
                     </div>
@@ -370,7 +314,7 @@ export default function KafkaExplorerView({
                       </div>
                       <div className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 text-right">
                         <div className="text-[10px] font-mono text-gray-400 uppercase">Replication</div>
-                        <div className="text-sm font-mono font-bold text-emerald-400">3x Synced</div>
+                        <div className="text-sm font-mono font-bold text-cyan-400">3x Synced</div>
                       </div>
                     </div>
                   </div>
@@ -403,7 +347,7 @@ export default function KafkaExplorerView({
                                 <Database size={13} className="text-cyan-400" />
                                 <span>Partition #{pIdx}</span>
                               </span>
-                              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
                                 In-Sync (ISR: 3)
                               </span>
                             </div>
@@ -411,7 +355,7 @@ export default function KafkaExplorerView({
                               <div>Leader: <span className="text-white">{leaderBroker}</span></div>
                               <div>HW Offset: <span className="text-cyan-300 font-bold">#{hwOffset}</span></div>
                               <div>Storage: <span className="text-gray-300">RocksDB FIFO</span></div>
-                              <div>Lag: <span className="text-emerald-400">0 msgs</span></div>
+                              <div>Lag: <span className="text-cyan-400">0 msgs</span></div>
                             </div>
                           </div>
                         );
@@ -462,7 +406,7 @@ export default function KafkaExplorerView({
                                 title="Copy JSON payload"
                               >
                                 {copiedOffset === msg.offset ? (
-                                  <span className="text-emerald-400 text-[10px]">Copied!</span>
+                                  <span className="text-cyan-400 text-[10px]">Copied!</span>
                                 ) : (
                                   <Copy size={12} />
                                 )}
@@ -486,78 +430,6 @@ export default function KafkaExplorerView({
                 Select a topic from the registry to inspect its ringbuffer partitions and commit log.
               </div>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: CONSUMER GROUPS */}
-      {activeTab === 'consumer-groups' && (
-        <div className="space-y-6">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.02] overflow-hidden">
-            <div className="p-4 border-b border-white/10 bg-white/[0.02] flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-semibold font-mono text-white flex items-center gap-2">
-                  <Users size={16} className="text-cyan-400" />
-                  <span>Consumer Groups & Lag Telemetry</span>
-                </h3>
-                <p className="text-[11px] font-mono text-gray-400 mt-0.5">
-                  Real-time consumer offset commits, member heartbeats, and partition rebalancing
-                </p>
-              </div>
-              <span className="text-xs font-mono bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full">
-                5 Active Groups
-              </span>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left font-mono text-xs">
-                <thead className="bg-black/60 border-b border-white/10 text-gray-400 text-[11px]">
-                  <tr>
-                    <th className="py-3 px-4">Group ID</th>
-                    <th className="py-3 px-4">Target Topic</th>
-                    <th className="py-3 px-4">State</th>
-                    <th className="py-3 px-4">Active Members</th>
-                    <th className="py-3 px-4">Consumer Lag</th>
-                    <th className="py-3 px-4">Coordinator Broker</th>
-                    <th className="py-3 px-4">Region</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {DEFAULT_CONSUMER_GROUPS.map((cg) => (
-                    <tr key={cg.groupId} className="hover:bg-white/[0.03] transition">
-                      <td className="py-3.5 px-4 font-semibold text-white flex items-center gap-2">
-                        <span className="text-gray-500">grp:</span>
-                        <span>{cg.groupId}</span>
-                      </td>
-                      <td className="py-3.5 px-4 text-cyan-300">#{cg.topic}</td>
-                      <td className="py-3.5 px-4">
-                        <span
-                          className={`text-[10px] px-2 py-0.5 rounded border ${
-                            cg.state === 'Stable'
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                              : 'bg-amber-500/10 text-amber-300 border-amber-500/20'
-                          }`}
-                        >
-                          {cg.state}
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-gray-300">{cg.membersCount} instances</td>
-                      <td className="py-3.5 px-4">
-                        <span
-                          className={`font-bold ${
-                            cg.totalLag === 0 ? 'text-emerald-400' : 'text-amber-400'
-                          }`}
-                        >
-                          {cg.totalLag} msgs
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-gray-300">{cg.assignedBroker}</td>
-                      <td className="py-3.5 px-4 text-gray-400">{cg.coordinatorRegion}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           </div>
         </div>
       )}
@@ -709,7 +581,7 @@ export default function KafkaExplorerView({
                   className={`mt-4 p-4 rounded-xl border text-xs font-mono ${
                     publishStatus.type === 'error'
                       ? 'border-purple-500/30 bg-purple-500/10 text-purple-200'
-                      : 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                      : 'border-cyan-500/30 bg-cyan-500/10 text-cyan-300'
                   }`}
                 >
                   <div className="font-semibold flex items-center gap-2">
@@ -749,9 +621,9 @@ export default function KafkaExplorerView({
 
                 <button
                   onClick={() => loadPresetPayload('upi')}
-                  className="w-full text-left p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] hover:bg-emerald-500/[0.08] transition font-mono text-xs"
+                  className="w-full text-left p-3 rounded-xl border border-cyan-500/20 bg-emerald-500/[0.04] hover:bg-emerald-500/[0.08] transition font-mono text-xs"
                 >
-                  <div className="font-semibold text-emerald-300 flex items-center justify-between">
+                  <div className="font-semibold text-cyan-300 flex items-center justify-between">
                     <span>RBI UPI Banking Settlement</span>
                     <ArrowUpRight size={13} />
                   </div>

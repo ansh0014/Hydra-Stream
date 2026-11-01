@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: hydra-frontend:v1.3
+          image: hydra-frontend:v2.1
           imagePullPolicy: Never
           env:
             - name: PORT
