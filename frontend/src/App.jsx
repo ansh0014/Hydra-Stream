@@ -273,6 +273,8 @@ export default function App() {
             regions={regions}
             clusterHealth={clusterHealth}
             throughput={throughput}
+            totalMessages={totalMessages}
+            gdprPrevented={gdprPrevented}
             activeChaos={activeChaos}
             events={events}
             onInjectSlowLink={handleInjectSlowLink}

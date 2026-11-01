@@ -123,7 +123,7 @@ export default function KafkaExplorerView({ topics = [], messages = [], onPublis
                           </span>
                         </td>
                         <td className="py-3 px-3 text-gray-300 font-medium">
-                          {(t.messagesTotal ?? messages.filter((m) => m.topic === t.name).length).toLocaleString()}
+                          {((t.messagesTotal ?? ((messages || []).filter((m) => m.topic === t.name).length)) || 0).toLocaleString()}
                         </td>
                       </tr>
                     );

@@ -129,7 +129,7 @@ const WORLD_CONTINENTS = [
   ]
 ];
 
-export default function TopologyView({ regions, throughput, totalMessages, gdprPrevented }) {
+export default function TopologyView({ regions = {}, throughput = 0, totalMessages = 0, gdprPrevented = 0 }) {
   const canvasRef = useRef(null);
   const [hoveredNode, setHoveredNode] = useState(null);
 
@@ -545,7 +545,7 @@ export default function TopologyView({ regions, throughput, totalMessages, gdprP
         <div className="p-5 rounded-2xl border border-white/10 bg-white/[0.02]">
           <div className="text-[11px] font-mono text-gray-400 uppercase tracking-wider">Pipeline Throughput</div>
           <div className="text-3xl font-medium text-white mt-2 font-mono flex items-baseline gap-2">
-            {throughput.toLocaleString()} <span className="text-xs font-normal text-gray-400">msg/sec</span>
+            {(throughput || 0).toLocaleString()} <span className="text-xs font-normal text-gray-400">msg/sec</span>
           </div>
           <div className="text-[11px] text-gray-400 font-mono mt-1">
             ▲ ~79.2 MB/sec Retained Log
@@ -555,7 +555,7 @@ export default function TopologyView({ regions, throughput, totalMessages, gdprP
         <div className="p-5 rounded-2xl border border-white/10 bg-white/[0.02]">
           <div className="text-[11px] font-mono text-gray-400 uppercase tracking-wider">Messages Streamed</div>
           <div className="text-3xl font-medium text-white mt-2 font-mono flex items-baseline gap-2">
-            {totalMessages.toLocaleString()}
+            {(totalMessages || 0).toLocaleString()}
           </div>
           <div className="text-[11px] text-purple-300 font-mono mt-1">
             ✔ Monotonic Offsets Synced

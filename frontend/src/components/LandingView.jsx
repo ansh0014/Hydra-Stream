@@ -109,7 +109,7 @@ export default function LandingView({ setActiveTab, throughput = 0, totalMessage
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
               <div className="text-[11px] font-mono text-gray-400 uppercase">Pipeline Ingress</div>
               <div className="text-2xl font-semibold text-white mt-1 font-mono">
-                {throughput > 0 ? throughput.toLocaleString() : 'Standby'}
+                {(throughput || 0) > 0 ? (throughput || 0).toLocaleString() : 'Standby'}
               </div>
               <div className="text-[11px] text-gray-400 font-mono mt-0.5">
                 {throughput > 0 ? `msg/sec (~${(throughput * 256 / 1024 / 1024).toFixed(1)} MB/s)` : 'Awaiting live traffic'}
