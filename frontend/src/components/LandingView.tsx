@@ -148,9 +148,9 @@ export default function LandingView({
             <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">
               <div className="text-[10px] font-mono text-gray-400 uppercase">Pipeline Ingress</div>
               <div className="text-xl font-semibold text-white mt-1 font-mono">
-                {throughput > 0 ? throughput.toLocaleString() : '309,597'}
+                {(throughput || 0).toLocaleString()}
               </div>
-              <div className="text-[10px] text-gray-400 font-mono mt-0.5">msg/s (~79.2 MB/s)</div>
+              <div className="text-[10px] text-gray-400 font-mono mt-0.5">msg/s (~{(((throughput || 0) * 256) / (1024 * 1024)).toFixed(1)} MB/s)</div>
             </div>
 
             <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5">

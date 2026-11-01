@@ -688,16 +688,23 @@ export default function TopologyView({
     return { initialNodes: nodes, initialEdges: edges };
   }, [regions]);
 
+    // Dynamic throughput history from live Prometheus metrics
+  const [throughputHistory, setThroughputHistory] = useState<number[]>(() => Array(20).fill(0));
+
+  useEffect(() => {
+    setThroughputHistory((prev) => [...prev.slice(1), throughput || 0]);
+  }, [throughput]);
+
   // Chart telemetry configuration
   const throughputData = {
     labels: Array(20).fill(''),
     datasets: [
       {
         label: 'Ingress Throughput (msg/s)',
-        data: Array(20).fill(309500).map((v) => v + (Math.random() * 8000 - 4000)),
-        borderColor: '#ffffff',
+        data: throughputHistory,
+        borderColor: '#38bdf8',
         borderWidth: 1.5,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        backgroundColor: 'rgba(56, 189, 248, 0.08)',
         tension: 0.3,
         fill: true,
         pointRadius: 0,
@@ -742,11 +749,11 @@ export default function TopologyView({
         <div className="p-5 rounded-2xl border border-white/10 bg-white/[0.02]">
           <div className="text-[11px] font-mono text-gray-400 uppercase tracking-wider">Pipeline Throughput</div>
           <div className="text-3xl font-medium text-white mt-2 font-mono flex items-baseline gap-2">
-            {(throughput || 0) > 0 ? (throughput || 0).toLocaleString() : '309,597'}{' '}
+            {(throughput || 0).toLocaleString()}{' '}
             <span className="text-xs font-normal text-gray-400">msg/sec</span>
           </div>
           <div className="text-[11px] text-gray-400 font-mono mt-1">
-            ▲ ~79.2 MB/sec Retained Log
+            ▲ ~{(((throughput || 0) * 256) / (1024 * 1024)).toFixed(1)} MB/sec Retained Log
           </div>
         </div>
 
@@ -990,7 +997,7 @@ export default function TopologyView({
               Ingress Telemetry (msg/sec)
             </h3>
             <span className="text-xs font-mono text-gray-400">
-              Live: {throughput > 0 ? (throughput / 1000).toFixed(1) : '309.5'}k msg/s
+              Live: {((throughput || 0) / 1000).toFixed(1)}k msg/s
             </span>
           </div>
           <div className="h-60">
